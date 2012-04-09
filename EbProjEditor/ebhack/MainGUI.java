@@ -147,20 +147,10 @@ public class MainGUI implements ActionListener, WindowListener {
                 "useHexNumbers", true, 'h'));
         optionsMenu.add(new PrefsCheckBox("Load Last Project on Startup", prefs,
                 "autoLoad", true, 'l'));
-        optionsMenu.add(new PrefsCheckBox("Use Wine for CCScript", prefs,
-                "useWine", false, 'w'));
         optionsMenu.add(new JSeparator());
-        optionsMenu.add(ToolModule.createJMenuItem("Select Executable...",
-                'x', null, "selectExe", this));
-        optionsMenu.add(ToolModule.createJMenuItem("Select CCScript Compiler...",
-                'c', null, "selectCCC", this));
-        optionsMenu.add(ToolModule.createJMenuItem("Select Clean ROM...",
-                'r', null, "selectDefROM", this));
-        optionsMenu.add(ToolModule.createJMenuItem("Select Emulator...",
-                'E', null, "selectEmu", this));
-        optionsMenu.add(ToolModule.createJMenuItem("Select Text Editor...",
-                't', null, "selectTE", this));
-        optionsMenu.add(new JSeparator());
+        //optionsMenu.add(ToolModule.createJMenuItem("Select Text Editor...",
+        //        't', null, "selectTE", this));
+        //optionsMenu.add(new JSeparator());
         optionsMenu.add(ToolModule.createJMenuItem("Set Default Author...", 'a', null, "setAuthor", this));
         menuBar.add(optionsMenu);
 
@@ -651,26 +641,6 @@ public class MainGUI implements ActionListener, WindowListener {
 	        		break;
 	        	}
 	        }
-		} else if (e.getActionCommand().equals("selectExe")) {
-		    if (System.getProperty("os.name").startsWith("Windows")) {
-		    	ToolModule.chooseFile(false, "exe", "Executable", "executable", "Select Executable");
-		    } else {
-		    	ToolModule.chooseFile(false, null, "Executable", "executable", "Select Executable");
-		    }
-		} else if (e.getActionCommand().equals("selectCCC")) {
-		    if (System.getProperty("os.name").startsWith("Windows")) {
-		    	ToolModule.chooseFile(false, "exe", "Executable", "ccc", "Select CCScript Compiler");
-		    } else {
-		    	ToolModule.chooseFile(false, null, "Executable", "ccc", "Select CCScript Compiler");
-		    }
-		} else if (e.getActionCommand().equals("selectDefROM")) {
-			ToolModule.chooseFile(false, "smc", "SNES ROM", "originalRom", "Select Clean ROM");
-		} else if (e.getActionCommand().equals("selectEmu")) {
-		    if (System.getProperty("os.name").startsWith("Windows")) {
-		    	ToolModule.chooseFile(false, "exe", "Executable", "emulator", "Select Emulator");
-		    } else {
-		    	ToolModule.chooseFile(false, null, "Executable", "emulator", "Select Emulator");
-		    }
 		} else if (e.getActionCommand().equals("selectTE")) {
 		    if (System.getProperty("os.name").startsWith("Windows")) {
 		    	ToolModule.chooseFile(false, "exe", "Executable", "textEditor", "Select Text Editor");
