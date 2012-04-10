@@ -25,16 +25,25 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
 import javax.swing.AbstractButton;
+import javax.swing.ButtonGroup;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollBar;
+import javax.swing.JSeparator;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -43,15 +52,22 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
+import ebhack.MapEditor.MapData.Sector;
+
 public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener {
 	
 	private JTextField xField, yField;
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
+	private JMenu modeMenu;
+	private JMenuItem sectorProps, findSprite, copySector, pasteSector, undo;
 	
 	public static MapData map;
 	private MapDisplay mapDisplay;
 	private TileSelector tileSelector;
+	
+	private MapData.Sector copiedSector;
+	private int[][] copiedSectorTiles = new int[4][8];
 	
 	public MapEditor(YMLPreferences prefs) {
 		super(prefs);
@@ -74,6 +90,122 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	public void init() {
         mainWindow = createBaseWindow(this);
         mainWindow.setTitle(this.getDescription());
+        
+        JMenuBar menuBar = new JMenuBar();
+		ButtonGroup group = new ButtonGroup();
+		JCheckBoxMenuItem checkBox;
+		JRadioButtonMenuItem radioButton;
+		JMenu menu;
+
+		menu = new JMenu("File");
+		menu.add(ToolModule.createJMenuItem("Apply Changes", 's', null,
+				"apply", this));
+		menu.add(ToolModule.createJMenuItem("Exit", 'x', null,
+				"close", this));
+		menuBar.add(menu);
+
+		menu = new JMenu("Edit");
+		undo = ToolModule.createJMenuItem("Undo Tile Change", 'u', null,
+				"undoMap", this);
+		undo.setEnabled(false);
+		//menu.add(undo);
+		copySector = ToolModule.createJMenuItem("Copy Sector", 'c', null,
+				"copySector", this);
+		menu.add(copySector);
+		pasteSector = ToolModule.createJMenuItem("Paste Sector", 'p', null,
+				"pasteSector", this);
+		menu.add(pasteSector);
+		sectorProps = ToolModule.createJMenuItem("Edit Sector's Properties",
+				'r', null, "sectorEdit", this);
+		//menu.add(sectorProps);
+		menuBar.add(menu);
+
+		modeMenu = new JMenu("Mode");
+		group = new ButtonGroup();
+		radioButton = new JRadioButtonMenuItem("Map Edit");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode0");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Sprite Edit");
+		radioButton.setSelected(false);
+		radioButton.setActionCommand("mode1");
+		radioButton.addActionListener(this);
+		//group.add(radioButton);
+		//modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Door Edit");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode2");
+		radioButton.addActionListener(this);
+		//group.add(radioButton);
+		//modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Hotspot Edit");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode6");
+		radioButton.addActionListener(this);
+		//group.add(radioButton);
+		//modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Enemy Edit");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode7");
+		radioButton.addActionListener(this);
+		//group.add(radioButton);
+		//modeMenu.add(radioButton);
+		menuBar.add(modeMenu);
+
+		menu = new JMenu("Tools");
+		findSprite = ToolModule.createJMenuItem("Find Sprite Entry", 'f',
+				null, "findSprite", this);
+		menu.add(findSprite);
+		menu.add(new JSeparator());
+		menu.add(ToolModule.createJMenuItem("Clear Map", 'm', null,
+				"delAllMap", this));
+		//menu.add(ToolModule.createJMenuItem("Delete All Sprites", 's', null,
+		//		"delAllSprites", this));
+		//menu.add(ToolModule.createJMenuItem("Delete All Doors", 'o', null,
+		//		"delAllDoors", this));
+		//menu.add(ToolModule.createJMenuItem("Clear Enemy Placements", 'e', null,
+		//		"delAllEnemies", this));
+		menu.add(new JSeparator());
+		menu.add(ToolModule.createJMenuItem("Clear Tile Image Cache", 't',
+				null, "resetTileImages", this));
+		menuBar.add(menu);
+
+		menu = new JMenu("Options");
+		checkBox = new JCheckBoxMenuItem("Show Grid");
+		checkBox.setMnemonic('g');
+		checkBox.setSelected(true);
+		checkBox.setActionCommand("grid");
+		checkBox.addActionListener(this);
+		menu.add(checkBox);
+		checkBox = new JCheckBoxMenuItem("Show Sprite Boxes");
+		checkBox.setMnemonic('b');
+		checkBox.setSelected(true);
+		checkBox.setActionCommand("spriteboxes");
+		checkBox.addActionListener(this);
+		//menu.add(checkBox);
+		checkBox = new JCheckBoxMenuItem("Show Enemy Sprites");
+		checkBox.setMnemonic('e');
+		checkBox.setSelected(true);
+		checkBox.setActionCommand("enemySprites");
+		checkBox.addActionListener(this);
+		//menu.add(checkBox);
+		checkBox = new JCheckBoxMenuItem("Show Enemy Colors");
+		checkBox.setMnemonic('l');
+		checkBox.setSelected(true);
+		checkBox.setActionCommand("enemycolors");
+		checkBox.addActionListener(this);
+		//menu.add(checkBox);
+		checkBox = new JCheckBoxMenuItem("Show Map Changes");
+		checkBox.setMnemonic('c');
+		checkBox.setSelected(false);
+		checkBox.setActionCommand("mapchanges");
+		checkBox.addActionListener(this);
+		//menu.add(checkBox);
+		menuBar.add(menu);
+		
+		mainWindow.setJMenuBar(menuBar);
 
 		JPanel contentPanel = new JPanel(new BorderLayout());
         
@@ -105,7 +237,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		tilesetChooser.setEnabled(false);
 		musicChooser.setEnabled(false);
 		
-		mapDisplay = new MapDisplay(map);
+		mapDisplay = new MapDisplay(map, copySector, pasteSector);
 		mapDisplay.addMouseWheelListener(this);
 		mapDisplay.addActionListener(this);
 		mapDisplay.init();
@@ -166,6 +298,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	
 	public static class MapDisplay extends AbstractButton implements MouseListener {
 		private MapData map;
+		private JMenuItem copySector, pasteSector;
 		
 		private final ActionEvent sectorEvent = new ActionEvent(this, ActionEvent.ACTION_PERFORMED, "sectorChanged");
 		
@@ -180,12 +313,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private MapData.Sector selectedSector = null;
 		private int sectorX, sectorY;
 		private int sectorPal;
+		private boolean grid = true;
 		
 		private TileSelector tileSelector;
 		
-		public MapDisplay(MapData map) {
+		public MapDisplay(MapData map, JMenuItem copySector, JMenuItem pasteSector) {
 			super();
 			this.map = map;
+			this.copySector = copySector;
+			this.pasteSector = pasteSector;
 			
 			if (tileImageCache == null)
 				resetTileImageCache();
@@ -193,12 +329,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			addMouseListener(this);
 			
 			setPreferredSize(new Dimension(
-					screenWidth * MapData.TILE_WIDTH + 3,
-					screenHeight * MapData.TILE_HEIGHT + 3));
+					screenWidth * MapData.TILE_WIDTH + 2,
+					screenHeight * MapData.TILE_HEIGHT + 2));
 		}
 		
 		public void init() {
-			//selectSector(0,0);
+			selectSector(0,0);
 		}
 		
 		public void setTileSelector(TileSelector tileSelector) {
@@ -214,8 +350,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			// Draw border
 			g2d.setColor(Color.black);
 			g2d.draw(new Rectangle2D.Double(0, 0,
-					screenWidth * MapData.TILE_WIDTH + 2,
-					screenHeight * MapData.TILE_HEIGHT + 2));
+					screenWidth * MapData.TILE_WIDTH + 1,
+					screenHeight * MapData.TILE_HEIGHT + 1));
 		}
 		
 		private void drawMap(Graphics2D g) {
@@ -241,7 +377,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				}
 			}
 			
-			drawGrid(g);
+			if (grid)
+				drawGrid(g);
 			
 			if (selectedSector != null) {
 				int sXt, sYt;
@@ -332,6 +469,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			return y;
 		}
 		
+		public int getSectorX() {
+			return sectorX;
+		}
+		
+		public int getSectorY() {
+			return sectorY;
+		}
+		
 		private void selectSector(int sX, int sY) {
 			sectorX = sX;
 			sectorY = sY;
@@ -340,9 +485,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				selectedSector = newS;
 				sectorPal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(selectedSector.tileset)].getPaletteNum(
 						selectedSector.tileset, selectedSector.palette);
+				copySector.setEnabled(true);
+				pasteSector.setEnabled(true);
 			} else {
 				// Un-select sector
 				selectedSector = null;
+				copySector.setEnabled(false);
+				pasteSector.setEnabled(false);
 			}
 			repaint();
 			this.fireActionPerformed(sectorEvent);
@@ -391,6 +540,30 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 
 		@Override
 		public void mouseExited(MouseEvent e) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void changeMode(int i) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void toggleGrid() {
+			grid = !grid;
+		}
+
+		public void toggleSpriteBoxes() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void toggleMapChanges() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void undoMapAction() {
 			// TODO Auto-generated method stub
 			
 		}
@@ -639,81 +812,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-	        /*if (f == null)
-	            return;
-        	Element root = new Element("Table");
-        	root.setAttribute("id", "sector_tsets");
-        	Document dom = new Document(root);
-        	int id = 0;
-        	Element entry, field;
-        	for (int i = 0; i < sectors.length; i++) {
-        		for (int j = 0; j < sectors[i].length; j++) {
-        			entry = new Element("Sector");
-        			entry.setAttribute("id", Integer.toString(id++));
-        			field = new Element("Tileset");
-        			field.setText(Integer.toString(sectors[i][j].tileset));
-        			entry.addContent(field);
-        			field = new Element("Palette");
-        			field.setText(Integer.toString(sectors[i][j].palette));
-        			entry.addContent(field);
-        			root.addContent(entry);
-        		}
-        	}
-            try {
-            	FileOutputStream fos = new FileOutputStream(f);
-                new XMLOutputter(Format.getPrettyFormat()).output(dom.getDocument(), fos);
-            } catch (IOException e) {
-    			// TODO Auto-generated catch block
-    			e.printStackTrace();
-    		}*/
-		}
-		
-		private void exportSectorMusic(File f) {
-	        /*if (f == null)
-	            return;
-        	Element root = new Element("Table");
-        	root.setAttribute("id", "sector_music");
-        	Document dom = new Document(root);
-        	int id = 0;
-        	Element entry, field;
-        	for (int i = 0; i < sectors.length; i++) {
-        		for (int j = 0; j < sectors[i].length; j++) {
-        			entry = new Element("Sector");
-        			entry.setAttribute("id", Integer.toString(id++));
-        			field = new Element("Music");
-        			field.setText(Integer.toString(sectors[i][j].music));
-        			entry.addContent(field);
-        			root.addContent(entry);
-        		}
-        	}
-            try {
-            	FileOutputStream fos = new FileOutputStream(f);
-                new XMLOutputter(Format.getPrettyFormat()).output(dom.getDocument(), fos);
-            } catch (IOException e) {
-    			// TODO Auto-generated catch block
-    			e.printStackTrace();
-    		}*/
-		}
-		
-		private void importSectorMusic(File f) {
-	        /*if (f == null)
-	            return;
-            try {
-    			Document dom = new SAXBuilder().build(f);
-    			List nl = dom.getRootElement().getChildren("Sector");
-    			ListIterator<Element> li = nl.listIterator();
-    			Element e;
-    			int num;
-    			while (li.hasNext()) {
-    				e = li.next();
-    				num = ToolModule.parseUserInt(e.getAttributeValue("id"));
-    				sectors[num/WIDTH_IN_SECTORS][num%WIDTH_IN_SECTORS].music = ToolModule.parseUserInt(e.getChildText("Music"));
-    			}
-    		} catch (JDOMException e) {
-    			e.printStackTrace();
-    		} catch (IOException e) {
-    			e.printStackTrace();
-    		}*/
 		}
 		
 		private void setMapTilesFromStream(InputStream in) {
@@ -764,6 +862,53 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public static class Sector {
 			public int tileset = 0, palette = 0, music = 0, item;
 			public String townmap, setting, teleport;
+			
+			public void reset() {
+				tileset = 0; palette = 0; music = 0; item = 0;
+				townmap = "none"; setting = "none"; teleport = "disabled";
+			}
+
+			public void copy(Sector other) {
+				try {
+					this.tileset = other.tileset;
+					this.palette = other.palette;
+					this.music = other.music;
+					this.item = other.item;
+					this.townmap = other.townmap;
+					this.setting = other.setting;
+					this.teleport = other.teleport;
+				} catch (Exception e) {
+					
+				}
+			}
+		}
+
+		public void nullSpriteData() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void nullMapData() {
+			for (int i = 0; i < mapTiles.length; i++) {
+				for (int j = 0; j < mapTiles[i].length; j++) {
+					mapTiles[i][j] = 0;
+				}
+			}
+			for (Sector[] row: sectors) {
+				for (Sector s: row) {
+					s.reset();
+				}
+			}
+		}
+
+		public void nullEnemyData() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void nullDoorData() {
+			// TODO Auto-generated method stub
+			
 		}
 	}
 
@@ -869,7 +1014,145 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
         	// TODO
         } else if (e.getActionCommand().equals("close")) {
             hide();
-        }
+        } else if (e.getActionCommand().equals("mode0")) {
+			mapDisplay.changeMode(0);
+		} else if (e.getActionCommand().equals("mode1")) {
+			mapDisplay.changeMode(1);
+		} else if (e.getActionCommand().equals("mode2")) {
+			mapDisplay.changeMode(2);
+		} else if (e.getActionCommand().equals("mode6")) {
+			mapDisplay.changeMode(6);
+		} else if (e.getActionCommand().equals("mode7")) {
+			mapDisplay.changeMode(7);
+			tileSelector.repaint();
+		} else if (e.getActionCommand().equals("delAllSprites")) {
+			int sure = JOptionPane.showConfirmDialog(mainWindow,
+					"Are you sure you want to "
+							+ "delete all of the sprites?",
+					"Are you sure?", JOptionPane.YES_NO_OPTION);
+			if (sure == JOptionPane.YES_OPTION) {
+				map.nullSpriteData();
+				mapDisplay.repaint();
+			}
+		} else if (e.getActionCommand().equals("delAllMap")) {
+			int sure = JOptionPane.showConfirmDialog(mainWindow,
+					"Are you sure you want to clear the map and sector data?",
+					"Are you sure?", JOptionPane.YES_NO_OPTION);
+			if (sure == JOptionPane.YES_OPTION) {
+				map.nullMapData();
+				mapDisplay.repaint();
+			}
+		} else if (e.getActionCommand().equals("delAllDoors")) {
+			int sure = JOptionPane.showConfirmDialog(mainWindow,
+					"Are you sure you want to delete the door placement data?",
+					"Are you sure?", JOptionPane.YES_NO_OPTION);
+			if (sure == JOptionPane.YES_OPTION) {
+				map.nullDoorData();
+				mapDisplay.repaint();
+			}
+		} else if (e.getActionCommand().equals("delAllEnemies")) {
+			int sure = JOptionPane.showConfirmDialog(mainWindow,
+					"Are you sure you want to clear the enemy data?",
+					"Are you sure?", JOptionPane.YES_NO_OPTION);
+			if (sure == JOptionPane.YES_OPTION) {
+				map.nullEnemyData();
+				mapDisplay.repaint();
+			}
+		} else if (e.getActionCommand().equals("resetTileImages")) {
+			mapDisplay.resetTileImageCache();
+			// TODO
+			/*if (gfxcontrol.getModeProps()[1] >= 2) {
+				mapDisplay.repaint();
+				mapDisplay.getTileChooser().repaint();
+			}*/
+		} else if (e.getActionCommand().equals("grid")) {
+			mapDisplay.toggleGrid();
+			mapDisplay.repaint();
+		} else if (e.getActionCommand().equals("spriteboxes")) {
+			mapDisplay.toggleSpriteBoxes();
+		} else if (e.getActionCommand().equals("mapchanges")) {
+			mapDisplay.toggleMapChanges();
+		} else if (e.getActionCommand().equals("sectorEdit")) {
+			//net.starmen.pkhack.JHack.main.showModule(
+			//		MapSectorPropertiesEditor.class, gfxcontrol
+			//				.getSectorxy());
+		} else if (e.getActionCommand().equals("findSprite")) {
+			String tpt = JOptionPane.showInputDialog(mainWindow,
+					"Enter TPT entry to search for.", Integer
+							.toHexString(0));
+			int tptNum, yesno;
+			try {
+				tptNum = Integer.parseInt(tpt, 16);
+			} catch (NumberFormatException nfe) {
+				JOptionPane.showMessageDialog(mainWindow,
+						"\"" + tpt + "\" is not a valid hexidecimal number.\n"
+						+ "Search was aborted.",
+						"Error", JOptionPane.ERROR_MESSAGE);
+				return;
+			}
+			/*if (tpt != null) {
+				for (int i = 0; i < (MapData.HEIGHT_IN_SECTORS / 2)
+						* MapData.WIDTH_IN_SECTORS; i++) {
+					ArrayList sprites = map.getSpritesData(i);
+					MapData.SpriteLocation spLoc;
+					int areaY, areaX;
+					for (int j = 0; j < sprites.size(); j++) {
+						spLoc = (MapData.SpriteLocation) sprites.get(j);
+						if (spLoc.getTpt() == tptNum) {
+							areaY = i / MapEditor.widthInSectors;
+							areaX = i - (areaY * MapEditor.widthInSectors);
+							gfxcontrol
+									.setMapXY(
+											(areaX * MapEditor.sectorWidth)
+													+ (spLoc.getX() / MapEditor.tileWidth),
+											(areaY * MapEditor.sectorHeight * 2)
+													+ (spLoc.getY() / MapEditor.tileHeight));
+							yesno = JOptionPane
+									.showConfirmDialog(
+											mainWindow,
+											"I found a sprite with that TPT entry. Do you want to find another?",
+											"Continue Search?",
+											JOptionPane.YES_NO_OPTION);
+							if (yesno == JOptionPane.NO_OPTION)
+								return;
+						}
+					}
+				}
+				JOptionPane.showMessageDialog(mainWindow,
+						"Could not find a sprite entry using TPT entry 0x"
+								+ tpt + ".");
+			}*/
+		} else if (e.getActionCommand().equals("copySector")) {
+			pasteSector.setEnabled(true);
+
+			int sectorX = mapDisplay.getSectorX();
+			int sectorY = mapDisplay.getSectorY();
+			for (int i = 0; i < copiedSectorTiles.length; i++)
+				for (int j = 0; j < copiedSectorTiles[i].length; j++)
+					copiedSectorTiles[i][j] = map.getMapTile(
+							j + sectorX * 8, i + sectorY * 4);
+			copiedSector = map.getSector(sectorX, sectorY);
+		} else if (e.getActionCommand().equals("pasteSector")) {
+			int sectorX = mapDisplay.getSectorX();
+			int sectorY = mapDisplay.getSectorY();
+			for (int i = 0; i < copiedSectorTiles.length; i++)
+				for (int j = 0; j < copiedSectorTiles[i].length; j++) {
+					map.setMapTile(sectorX * 8 + j,
+							sectorY * 4 + i,
+							copiedSectorTiles[i][j]);
+				}
+			map.getSector(sectorX, sectorY).copy(copiedSector);
+			mapDisplay.repaint();
+			//gfxcontrol.updateComponents();
+		/*} else if (ac.equals(ENEMY_SPRITES)) {
+			gfxcontrol.toggleEnemySprites();
+		} else if (ac.equals(ENEMY_COLORS)) {
+			gfxcontrol.toggleEnemyColors();
+		} else if (ac.equals(EVENTPAL)) {
+			gfxcontrol.toggleEventPalette();*/
+		} else if (e.getActionCommand().equals("undoMap")) {
+			mapDisplay.undoMapAction();
+		}
 	}
 
 	public void changedUpdate(DocumentEvent e) {
