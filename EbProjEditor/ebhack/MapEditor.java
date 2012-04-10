@@ -22,10 +22,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 import javax.swing.AbstractButton;
 import javax.swing.JComboBox;
@@ -36,20 +39,24 @@ import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.DumperOptions.FlowStyle;
+import org.yaml.snakeyaml.Yaml;
+
 public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener {
 	
 	private JTextField xField, yField;
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
 	
-	public static Map map;
+	public static MapData map;
 	private MapDisplay mapDisplay;
 	private TileSelector tileSelector;
 	
 	public MapEditor(YMLPreferences prefs) {
 		super(prefs);
 		
-		map = new Map();
+		map = new MapData();
 	}
 
 	public String getDescription() {
@@ -72,11 +79,11 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
         
 		JPanel panel = new JPanel(new FlowLayout());
 		panel.add(new JLabel("X: "));
-		xField = ToolModule.createSizedJTextField(Integer.toString(Map.WIDTH_IN_TILES).length(), true);
+		xField = ToolModule.createSizedJTextField(Integer.toString(MapData.WIDTH_IN_TILES).length(), true);
 		xField.getDocument().addDocumentListener(this);
 		panel.add(xField);
 		panel.add(new JLabel("Y: "));
-		yField = ToolModule.createSizedJTextField(Integer.toString(Map.HEIGHT_IN_TILES).length(), true);
+		yField = ToolModule.createSizedJTextField(Integer.toString(MapData.HEIGHT_IN_TILES).length(), true);
 		panel.add(yField);
 		panel.add(new JLabel("Tileset: "));
 		tilesetChooser = new JComboBox();
@@ -104,10 +111,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		mapDisplay.init();
 		contentPanel.add(mapDisplay, BorderLayout.CENTER);
 		
-		xScroll = new JScrollBar(JScrollBar.HORIZONTAL, 0, mapDisplay.getScreenWidth(), 0, Map.WIDTH_IN_TILES);
+		xScroll = new JScrollBar(JScrollBar.HORIZONTAL, 0, mapDisplay.getScreenWidth(), 0, MapData.WIDTH_IN_TILES);
 		xScroll.addAdjustmentListener(this);
 		contentPanel.add(xScroll, BorderLayout.SOUTH);
-		yScroll = new JScrollBar(JScrollBar.VERTICAL, 0, mapDisplay.getScreenHeight(), 0, Map.HEIGHT_IN_TILES);
+		yScroll = new JScrollBar(JScrollBar.VERTICAL, 0, mapDisplay.getScreenHeight(), 0, MapData.HEIGHT_IN_TILES);
 		yScroll.addAdjustmentListener(this);
 		contentPanel.add(yScroll, BorderLayout.EAST);
 		
@@ -130,7 +137,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	private void loadTilesetNames() {
 		tilesetChooser.removeActionListener(this);
 		tilesetChooser.removeAllItems();
-		for (int i = 0; i < Map.NUM_MAP_TSETS; i++)
+		for (int i = 0; i < MapData.NUM_MAP_TSETS; i++)
 			tilesetChooser.addItem(getNumberedString(
 					TileEditor.TILESET_NAMES[TileEditor.getDrawTilesetNumber(i)], i,
 					false));
@@ -158,7 +165,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	}
 	
 	public static class MapDisplay extends AbstractButton implements MouseListener {
-		private Map map;
+		private MapData map;
 		
 		private final ActionEvent sectorEvent = new ActionEvent(this, ActionEvent.ACTION_PERFORMED, "sectorChanged");
 		
@@ -170,13 +177,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		// Map X and Y coordinates of the tile displayed in the top left corner
 		private int x = 0, y = 0;
 		// Data for the selected sector
-		private Map.Sector selectedSector = null;
+		private MapData.Sector selectedSector = null;
 		private int sectorX, sectorY;
 		private int sectorPal;
 		
 		private TileSelector tileSelector;
 		
-		public MapDisplay(Map map) {
+		public MapDisplay(MapData map) {
 			super();
 			this.map = map;
 			
@@ -186,12 +193,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			addMouseListener(this);
 			
 			setPreferredSize(new Dimension(
-					screenWidth * Map.TILE_WIDTH + 3,
-					screenHeight * Map.TILE_HEIGHT + 3));
+					screenWidth * MapData.TILE_WIDTH + 3,
+					screenHeight * MapData.TILE_HEIGHT + 3));
 		}
 		
 		public void init() {
-			selectSector(0,0);
+			//selectSector(0,0);
 		}
 		
 		public void setTileSelector(TileSelector tileSelector) {
@@ -207,29 +214,29 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			// Draw border
 			g2d.setColor(Color.black);
 			g2d.draw(new Rectangle2D.Double(0, 0,
-					screenWidth * Map.TILE_WIDTH + 2,
-					screenHeight * Map.TILE_HEIGHT + 2));
+					screenWidth * MapData.TILE_WIDTH + 2,
+					screenHeight * MapData.TILE_HEIGHT + 2));
 		}
 		
 		private void drawMap(Graphics2D g) {
 			g.setPaint(Color.white);
 			g.setFont(new Font("Arial", Font.PLAIN, 12));
 			
-			Map.Sector sector;
+			MapData.Sector sector;
 			int pal;
 			for (int i = 0; i < screenHeight; i++) {
 				for (int j = 0; j < screenWidth; j++) {
 
 					sector = map.getSector(
-							(j + x)/Map.SECTOR_WIDTH,
-							(i + y)/Map.SECTOR_HEIGHT);
+							(j + x)/MapData.SECTOR_WIDTH,
+							(i + y)/MapData.SECTOR_HEIGHT);
 					pal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(sector.tileset)].getPaletteNum(
 							sector.tileset, sector.palette);
 					g.drawImage(
 							getTileImage(TileEditor.getDrawTilesetNumber(sector.tileset),
 									map.getMapTile(x+j, y+i), pal),
-							j*Map.TILE_WIDTH + 1, i*Map.TILE_HEIGHT + 1,
-							Map.TILE_WIDTH, Map.TILE_HEIGHT,
+							j*MapData.TILE_WIDTH + 1, i*MapData.TILE_HEIGHT + 1,
+							MapData.TILE_WIDTH, MapData.TILE_HEIGHT,
 							this);
 				}
 			}
@@ -238,16 +245,16 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			
 			if (selectedSector != null) {
 				int sXt, sYt;
-				if (((sXt = sectorX * Map.SECTOR_WIDTH) + Map.SECTOR_WIDTH >= x)
+				if (((sXt = sectorX * MapData.SECTOR_WIDTH) + MapData.SECTOR_WIDTH >= x)
 						&& (sXt < x+screenWidth)
-						&& ((sYt = sectorY * Map.SECTOR_HEIGHT) + Map.SECTOR_HEIGHT >= y)
+						&& ((sYt = sectorY * MapData.SECTOR_HEIGHT) + MapData.SECTOR_HEIGHT >= y)
 						&& (sYt < y+screenHeight)) {
 					g.setPaint(Color.yellow);
 					g.draw(new Rectangle2D.Double(
-							(sXt - x) * Map.TILE_WIDTH + 1,
-							(sYt - y) * Map.TILE_HEIGHT + 1,
-							Map.SECTOR_WIDTH * Map.TILE_WIDTH,
-							Map.SECTOR_HEIGHT * Map.TILE_HEIGHT));
+							(sXt - x) * MapData.TILE_WIDTH + 1,
+							(sYt - y) * MapData.TILE_HEIGHT + 1,
+							MapData.SECTOR_WIDTH * MapData.TILE_WIDTH,
+							MapData.SECTOR_HEIGHT * MapData.TILE_HEIGHT));
 				}
 			}
 		}
@@ -256,16 +263,16 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			g.setPaint(Color.black);
 			// Draw vertical lines
 			for (int i = 0; i < screenWidth+1; i++)
-				g.drawLine(1 + i * Map.TILE_WIDTH, 1, 1 + i * Map.TILE_WIDTH, screenHeight * Map.TILE_HEIGHT);
+				g.drawLine(1 + i * MapData.TILE_WIDTH, 1, 1 + i * MapData.TILE_WIDTH, screenHeight * MapData.TILE_HEIGHT);
 			// Draw horizontal lines
 			for (int i = 0; i < screenHeight+1; i++)
-				g.drawLine(1, 1 + i * Map.TILE_HEIGHT, screenWidth * Map.TILE_WIDTH, 1 + i * Map.TILE_HEIGHT);
+				g.drawLine(1, 1 + i * MapData.TILE_HEIGHT, screenWidth * MapData.TILE_WIDTH, 1 + i * MapData.TILE_HEIGHT);
 			
 			// Blank pixel in the bottom right corner
-			g.drawLine(screenWidth * Map.TILE_WIDTH + 1,
-					screenHeight * Map.TILE_HEIGHT + 1,
-					screenWidth * Map.TILE_WIDTH + 1,
-					screenHeight * Map.TILE_HEIGHT + 1);
+			g.drawLine(screenWidth * MapData.TILE_WIDTH + 1,
+					screenHeight * MapData.TILE_HEIGHT + 1,
+					screenWidth * MapData.TILE_WIDTH + 1,
+					screenHeight * MapData.TILE_HEIGHT + 1);
 		}
 		
 		public static Image getTileImage(int loadtset, int loadtile, int loadpalette) {
@@ -288,7 +295,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			return screenHeight;
 		}
 		
-		public Map.Sector getSelectedSector() {
+		public MapData.Sector getSelectedSector() {
 			return selectedSector;
 		}
 		
@@ -328,7 +335,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private void selectSector(int sX, int sY) {
 			sectorX = sX;
 			sectorY = sY;
-			Map.Sector newS = map.getSector(sectorX, sectorY);
+			MapData.Sector newS = map.getSector(sectorX, sectorY);
 			if (selectedSector != newS) {
 				selectedSector = newS;
 				sectorPal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(selectedSector.tileset)].getPaletteNum(
@@ -344,11 +351,11 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		@Override
 		public void mouseClicked(MouseEvent e) {
 			// Make sure they didn't click on the border
-			if ((e.getX() >= 1) && (e.getX() <= screenWidth * Map.TILE_WIDTH + 2)
-					&& (e.getY() >= 1) && (e.getY() <= screenHeight * Map.TILE_HEIGHT + 2)) {
+			if ((e.getX() >= 1) && (e.getX() <= screenWidth * MapData.TILE_WIDTH + 2)
+					&& (e.getY() >= 1) && (e.getY() <= screenHeight * MapData.TILE_HEIGHT + 2)) {
 				if (e.getButton() == MouseEvent.BUTTON1) {
-					int mX = (e.getX() - 1) / Map.TILE_WIDTH + x;
-					int mY = (e.getY() - 1) / Map.TILE_HEIGHT + y;
+					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
+					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
 					if (e.isShiftDown()) {
 						tileSelector.selectTile(map.getMapTile(mX, mY));
 					} else {
@@ -357,8 +364,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					}
 				} else if (e.getButton() == MouseEvent.BUTTON3) {
 					// Make sure they didn't click on the border
-					int sX = (x + ((e.getX() - 1) / Map.TILE_WIDTH)) / Map.SECTOR_WIDTH;
-					int sY = (y + ((e.getY() - 1) / Map.TILE_HEIGHT)) / Map.SECTOR_HEIGHT;
+					int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH)) / MapData.SECTOR_WIDTH;
+					int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT)) / MapData.SECTOR_HEIGHT;
 					selectSector(sX, sY);
 				}
 			}
@@ -404,8 +411,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			scroll.addAdjustmentListener(this);
 			
 			setPreferredSize(new Dimension(
-					width * Map.TILE_WIDTH + 3,
-					height * Map.TILE_HEIGHT + 3));
+					width * MapData.TILE_WIDTH + 3,
+					height * MapData.TILE_HEIGHT + 3));
 			
 			this.addMouseListener(this);
     	}
@@ -450,14 +457,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 										TileEditor.getDrawTilesetNumber(tilesetChooser.getSelectedIndex()),
 										dtile,
 										mapDisplay.getSelectedSectorPalNumber()),
-								i*Map.TILE_WIDTH + 1, j*Map.TILE_HEIGHT + 1,
-								Map.TILE_WIDTH, Map.TILE_HEIGHT,
+								i*MapData.TILE_WIDTH + 1, j*MapData.TILE_HEIGHT + 1,
+								MapData.TILE_WIDTH, MapData.TILE_HEIGHT,
 								this);
 						if (dtile == tile) {
 							g.setPaint(Color.yellow);
 							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
-							g.fillRect(i*Map.TILE_WIDTH + 1, j*Map.TILE_HEIGHT + 1,
-									Map.TILE_WIDTH, Map.TILE_HEIGHT);
+							g.fillRect(i*MapData.TILE_WIDTH + 1, j*MapData.TILE_HEIGHT + 1,
+									MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
 							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
 						}
 					}
@@ -469,22 +476,22 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			g.setPaint(Color.black);
 			// Draw vertical lines
 			for (int i = 0; i < width+1; i++)
-				g.drawLine(1 + i * Map.TILE_WIDTH, 1, 1 + i * Map.TILE_WIDTH, height * Map.TILE_HEIGHT);
+				g.drawLine(1 + i * MapData.TILE_WIDTH, 1, 1 + i * MapData.TILE_WIDTH, height * MapData.TILE_HEIGHT);
 			// Draw horizontal lines
 			for (int i = 0; i < height+1; i++)
-				g.drawLine(1, 1 + i * Map.TILE_HEIGHT, width * Map.TILE_WIDTH, 1 + i * Map.TILE_HEIGHT);
+				g.drawLine(1, 1 + i * MapData.TILE_HEIGHT, width * MapData.TILE_WIDTH, 1 + i * MapData.TILE_HEIGHT);
 			
 			// Blank pixel in the bottom right corner
-			g.drawLine(width * Map.TILE_WIDTH + 1,
-					height * Map.TILE_HEIGHT + 1,
-					width * Map.TILE_WIDTH + 1,
-					height * Map.TILE_HEIGHT + 1);
+			g.drawLine(width * MapData.TILE_WIDTH + 1,
+					height * MapData.TILE_HEIGHT + 1,
+					width * MapData.TILE_WIDTH + 1,
+					height * MapData.TILE_HEIGHT + 1);
 			
 			// Draw border
 			g.setColor(Color.black);
 			g.draw(new Rectangle2D.Double(0, 0,
-					width * Map.TILE_WIDTH + 2,
-					height * Map.TILE_HEIGHT + 2));
+					width * MapData.TILE_WIDTH + 2,
+					height * MapData.TILE_HEIGHT + 2));
 		}
 		
 		public void adjustmentValueChanged(AdjustmentEvent e) {
@@ -493,8 +500,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 
 		public void mouseClicked(MouseEvent e) {
 			if ((e.getButton() == MouseEvent.BUTTON1) && isEnabled()) {
-				tile = (((e.getX()-1) / Map.TILE_WIDTH) + scroll.getValue()) * height
-							+ ((e.getY()-1) / Map.TILE_HEIGHT);
+				tile = (((e.getX()-1) / MapData.TILE_WIDTH) + scroll.getValue()) * height
+							+ ((e.getY()-1) / MapData.TILE_HEIGHT);
 				repaint();
 			}
 		}
@@ -508,7 +515,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void mouseExited(MouseEvent e) { }
     }
 	
-	public static class Map {
+	public static class MapData {
 		public static final int WIDTH_IN_TILES = 32*8;
 		public static final int HEIGHT_IN_TILES = 80*4;
 		public static final int SECTOR_WIDTH = 8;
@@ -525,7 +532,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private int[][] mapTiles;
 		private Sector[][] sectors;
 		
-		public Map() {
+		public MapData() {
 			reset();
 		}
 		
@@ -539,14 +546,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		public void load(Project proj) {
 			importMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
-			importSectorTilesets(new File(proj.getFilename("eb.MapModule", "map_sector_tsets"))); // TODO
-			importSectorMusic(new File(proj.getFilename("eb.MiscTablesModule", "map_sector_music")));
+			importSectors(new File(proj.getFilename("eb.MapModule", "map_sectors"))); // TODO
 		}
 		
 		public void save(Project proj) {
 			exportMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
-			exportSectorTilesets(new File(proj.getFilename("eb.MapModule", "map_sector_tsets")));
-			exportSectorMusic(new File(proj.getFilename("eb.MiscTablesModule", "map_sector_music")));
+			exportSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
 		}
 		
 		public Sector getSector(int sectorX, int sectorY) {
@@ -579,29 +584,61 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 		}
 		
-		private void importSectorTilesets(File f) {
-	        /*if (f == null)
-	            return;
-            try {
-    			Document dom = new SAXBuilder().build(f);
-    			List nl = dom.getRootElement().getChildren("Sector");
-    			ListIterator<Element> li = nl.listIterator();
-    			Element e;
-    			int num;
-    			while (li.hasNext()) {
-    				e = li.next();
-    				num = ToolModule.parseUserInt(e.getAttributeValue("id"));
-    				sectors[num/WIDTH_IN_SECTORS][num%WIDTH_IN_SECTORS].tileset = ToolModule.parseUserInt(e.getChildText("Tileset"));
-    				sectors[num/WIDTH_IN_SECTORS][num%WIDTH_IN_SECTORS].palette = ToolModule.parseUserInt(e.getChildText("Palette"));
-    			}
-    		} catch (JDOMException e) {
-    			e.printStackTrace();
-    		} catch (IOException e) {
-    			e.printStackTrace();
-    		}*/
+		private void importSectors(File f) {
+			InputStream input;
+			try {
+				input = new FileInputStream(f);
+				Yaml yaml = new Yaml();
+				Map<Integer, Map<String, Object>> sectorsMap = (Map<Integer, Map<String, Object>>) yaml.load(input);
+				
+				int y, x;
+				Sector sec;
+				for (Map.Entry<Integer, Map<String, Object>> entry: sectorsMap.entrySet()) {
+					y = entry.getKey() / WIDTH_IN_SECTORS;
+					x = entry.getKey() % WIDTH_IN_SECTORS;
+					sec = sectors[y][x];
+					sec.tileset = (Integer) (entry.getValue().get("Tileset"));
+					sec.palette = (Integer) (entry.getValue().get("Palette"));
+					sec.music = (Integer) (entry.getValue().get("Music"));
+					sec.item = (Integer) (entry.getValue().get("Item"));
+					sec.teleport = (String) (entry.getValue().get("Teleport"));
+					sec.townmap = (String) (entry.getValue().get("Town Map"));
+					sec.setting = (String) (entry.getValue().get("Setting"));
+				}
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		
-		private void exportSectorTilesets(File f) {
+		private void exportSectors(File f) {
+			Map<Integer, Map<String, Object>> sectorsMap = new HashMap<Integer, Map<String, Object>>();
+			int i = 0;
+			for (Sector[] row: sectors) {
+				for (Sector s: row) {
+					Map<String, Object> entry = new HashMap<String, Object>();
+					entry.put("Item", s.item);
+					entry.put("Music", s.music);
+					entry.put("Palette", s.palette);
+					entry.put("Setting", s.setting);
+					entry.put("Teleport", s.teleport);
+					entry.put("Tileset", s.tileset);
+					entry.put("Town Map", s.townmap);
+					sectorsMap.put(i, entry);
+					++i;
+				}
+			}
+			
+			try {
+				FileWriter fw = new FileWriter(f);
+				DumperOptions options = new DumperOptions();
+			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
+			    Yaml yaml = new Yaml(options);
+	        	yaml.dump(sectorsMap, fw);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	        /*if (f == null)
 	            return;
         	Element root = new Element("Table");
@@ -680,13 +717,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 		
 		private void setMapTilesFromStream(InputStream in) {
-			int tmp1, tmp2;
+			String tmp;
 			try {
 				for (int i = 0; i < mapTiles.length; i++) {
 					for (int j = 0; j < mapTiles[i].length; j++) {
-						tmp1 = in.read();
-						tmp2 = in.read();
-						mapTiles[i][j] = tmp1 + (tmp2<<8);
+						tmp = ""+((char) in.read());
+						tmp += (char) in.read();
+						tmp += (char) in.read();
+						mapTiles[i][j] = Integer.parseInt(tmp, 16);
+						in.read(); // " " or "\n"
 					}
 				}
 			} catch (Exception e) {
@@ -695,12 +734,19 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 		
 		private void writeMapTilesToStream(FileOutputStream out) {
+			// TODO
 			try {
+				String tmp;
 				for (int i = 0; i < mapTiles.length; i++) {
 					for (int j = 0; j < mapTiles[i].length; j++) {
-						out.write(mapTiles[i][j] & 0xff);
-						out.write((mapTiles[i][j]>>8) & 0x3);
+						tmp = ToolModule.addZeros(Integer.toHexString(mapTiles[i][j]), 3);
+						out.write(tmp.charAt(0));
+						out.write(tmp.charAt(1));
+						out.write(tmp.charAt(2));
+						if (j != mapTiles[i].length - 1)
+							out.write(' ');
 					}
+					out.write('\n');
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -716,9 +762,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 		
 		public static class Sector {
-			public int tileset = 0, palette = 0, music = 0;
-			//public int townmap, misc, item;
-			//public boolean cantTeleport, unknown;
+			public int tileset = 0, palette = 0, music = 0, item;
+			public String townmap, setting, teleport;
 		}
 	}
 
@@ -776,7 +821,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 
 	public void actionPerformed(ActionEvent e) {
 		if (e.getActionCommand().equals("sectorChanged")) {
-			Map.Sector sect = mapDisplay.getSelectedSector();
+			MapData.Sector sect = mapDisplay.getSelectedSector();
 			if (sect == null) {
 				tilesetChooser.setEnabled(false);
 				palChooser.setEnabled(false);
@@ -793,6 +838,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					tilesetChooser.setSelectedIndex(sect.tileset);
 					tilesetChooser.addActionListener(this);
 				} else if (palChooser.getSelectedIndex() != sect.palette) {
+					updatePaletteChooser(sect.tileset, sect.palette);
 					palChooser.removeActionListener(this);
 					palChooser.setSelectedIndex(sect.palette);
 					palChooser.addActionListener(this);
@@ -833,13 +879,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				&& (xField.getText().length() > 0)) {
 			int newX = Integer.parseInt(xField.getText()),
 				newY = Integer.parseInt(yField.getText());
-			if (newX > Map.WIDTH_IN_TILES - mapDisplay.getScreenWidth()) {
-				newY = Map.WIDTH_IN_TILES - mapDisplay.getScreenHeight();
+			if (newX > MapData.WIDTH_IN_TILES - mapDisplay.getScreenWidth()) {
+				newY = MapData.WIDTH_IN_TILES - mapDisplay.getScreenHeight();
 			} else if (newY < 0) {
 				newY = 0;
 			}
-			if (newY > Map.HEIGHT_IN_TILES - mapDisplay.getScreenHeight()) {
-				newY = Map.HEIGHT_IN_TILES - mapDisplay.getScreenHeight();
+			if (newY > MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight()) {
+				newY = MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight();
 			} else if (newY < 0) {
 				newY = 0;
 			}
@@ -869,8 +915,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 
 	public void mouseWheelMoved(MouseWheelEvent e) {
 		int y = mapDisplay.getMapY() + (e.getWheelRotation() * 3);
-		if (y > Map.HEIGHT_IN_TILES - mapDisplay.getScreenHeight())
-			y = Map.HEIGHT_IN_TILES - mapDisplay.getScreenHeight();
+		if (y > MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight())
+			y = MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight();
 		else if (y < 0)
 			y = 0;
 		if (y != mapDisplay.getMapY()) {
