@@ -1,3 +1,4 @@
 ProjectEditor
 TileEditor
+SpriteLoader
 MapEditor

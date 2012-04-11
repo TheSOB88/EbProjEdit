@@ -324,7 +324,10 @@ public class MainGUI implements ActionListener, WindowListener {
 	private void loadModulesData() {
         ListIterator<ToolModule> listIterator = moduleList.listIterator();
         while(listIterator.hasNext()) {
-        	listIterator.next().load(project);
+        	ToolModule x = listIterator.next();
+        	System.out.println("Loading " + x.getDescription());
+        	x.load(project);
+        	//listIterator.next().load(project);
         }
 	}
 	

@@ -314,6 +314,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private int sectorX, sectorY;
 		private int sectorPal;
 		private boolean grid = true;
+		private boolean drawSprites = true;
 		
 		private TileSelector tileSelector;
 		
@@ -394,6 +395,47 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							MapData.SECTOR_HEIGHT * MapData.TILE_HEIGHT));
 				}
 			}
+			
+			MapData.NPC npc;
+			int w, h;
+			if (drawSprites) {
+				g.setPaint(Color.RED);
+				List<MapData.SpriteEntry> area;
+				for (int i = y&(~7); i < (y&(~7)) + screenHeight + 8; i += 8) {
+					for (int j = x&(~7); j < (x&(~7)) + screenWidth + 8; j += 8) {
+						try {
+							area = map.getSpriteArea(j>>3, i>>3);
+							for (MapData.SpriteEntry e : area) {
+								npc = map.getNPC(e.npcID);
+								w = SpriteLoader.getSpriteW(npc.sprite);
+								h = SpriteLoader.getSpriteH(npc.sprite);
+								g.draw(new Rectangle2D.Double(
+										e.x + (j-x)*MapData.TILE_WIDTH - w/2,
+										e.y + (i-y)*MapData.TILE_HEIGHT - h/2,
+										w, h));
+								g.drawImage(SpriteLoader.getSprite(npc.sprite, npc.direction),
+										e.x + (j-x)*MapData.TILE_WIDTH - w/2,
+										e.y + (i-y)*MapData.TILE_HEIGHT - h/2,
+										this);
+							}
+						} catch (Exception e) {
+							
+						}
+					}
+				}
+			}
+		}
+		
+		private void drawSprite(Graphics2D g, int n, int dir, int x, int y) {
+			g.setColor(Color.red);
+			int w = SpriteLoader.getSpriteW(n), h = SpriteLoader.getSpriteH(n);
+			g.draw(new Rectangle2D.Double(
+					x - w/2, y - h/2, w, h));
+			
+			g.drawImage(SpriteLoader.getSprite(n, dir),
+					x - SpriteLoader.getSpriteW(n)/2,
+					y - SpriteLoader.getSpriteH(n)/2,
+					this);
 		}
 		
 		private void drawGrid(Graphics2D g) {
@@ -704,6 +746,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		// Stores the map tiles
 		private int[][] mapTiles;
 		private Sector[][] sectors;
+		private ArrayList<SpriteEntry>[][] spriteAreas;
+		private NPC[] npcs;
 		
 		public MapData() {
 			reset();
@@ -712,14 +756,21 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void reset() {
 			mapTiles = new int[HEIGHT_IN_TILES][WIDTH_IN_TILES];
 			sectors = new Sector[HEIGHT_IN_SECTORS][WIDTH_IN_SECTORS];
-			for (int i = 0; i < sectors.length; i++)
-				for (int j = 0; j < sectors[i].length; j++)
+			for (int i = 0; i < sectors.length; ++i)
+				for (int j = 0; j < sectors[i].length; ++j)
 					sectors[i][j] = new Sector();
+			spriteAreas = new ArrayList[HEIGHT_IN_SECTORS/2][WIDTH_IN_SECTORS];
+			for (int i = 0; i < spriteAreas.length; ++i)
+				for (int j = 0; j < spriteAreas[i].length; ++j)
+					spriteAreas[i][j] = new ArrayList<SpriteEntry>();
+			npcs = new NPC[1584];
 		}
 		
 		public void load(Project proj) {
 			importMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
-			importSectors(new File(proj.getFilename("eb.MapModule", "map_sectors"))); // TODO
+			importSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
+			importSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
+			importNPCs(new File(proj.getFilename("eb.MiscTablesModule", "npc_config_table")));
 		}
 		
 		public void save(Project proj) {
@@ -727,8 +778,16 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			exportSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
 		}
 		
+		public NPC getNPC(int n) {
+			return npcs[n];
+		}
+		
 		public Sector getSector(int sectorX, int sectorY) {
 			return sectors[sectorY][sectorX];
+		}
+		
+		public List<SpriteEntry> getSpriteArea(int areaX, int areaY) {
+			return spriteAreas[areaY][areaX];
 		}
 		
 		private void importMapTiles(File f) {
@@ -751,6 +810,55 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			try {
 				FileOutputStream out = new FileOutputStream(f);
 		        writeMapTilesToStream(out);
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		private void importNPCs(File f) {
+			InputStream input;
+			try {
+				input = new FileInputStream(f);
+				Yaml yaml = new Yaml();
+				Map<Integer, Map<String, Object>> sectorsMap = (Map<Integer, Map<String, Object>>) yaml.load(input);
+				
+				NPC npc;
+				for (Map.Entry<Integer, Map<String, Object>> entry: sectorsMap.entrySet()) {
+					npc = new NPC((Integer) entry.getValue().get("Sprite"),
+							(String) entry.getValue().get("Direction"));
+					npcs[entry.getKey()] = npc;
+				}
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		private void importSpritePlacements(File f) {
+			InputStream input;
+			try {
+				input = new FileInputStream(f);
+				Yaml yaml = new Yaml();
+				Map<Integer, Map<Integer, List<Map<String, Integer>>>> spritesMap =
+						(Map<Integer, Map<Integer, List<Map<String, Integer>>>>) yaml.load(input);
+				int y, x;
+				ArrayList<SpriteEntry> area;
+				for (Map.Entry<Integer, Map<Integer, List<Map<String, Integer>>>> rowEntry: spritesMap.entrySet()) {
+					y = rowEntry.getKey();
+					for (Map.Entry<Integer, List<Map<String, Integer>>> entry: rowEntry.getValue().entrySet()) {
+						x = entry.getKey();
+						area = this.spriteAreas[y][x];
+						area.clear();
+						if (entry.getValue() == null)
+							continue;
+						
+						for (Map<String, Integer> spe : entry.getValue()) {
+							area.add(new SpriteEntry(
+									spe.get("X"), spe.get("Y"), spe.get("NPC ID")));
+						}
+					}
+				}
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -832,7 +940,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 		
 		private void writeMapTilesToStream(FileOutputStream out) {
-			// TODO
 			try {
 				String tmp;
 				for (int i = 0; i < mapTiles.length; i++) {
@@ -880,6 +987,30 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				} catch (Exception e) {
 					
 				}
+			}
+		}
+		
+		public static class SpriteEntry {
+			public int x, y, npcID;
+			public SpriteEntry(int x, int y, int npcID) {
+				this.x = x; this.y = y; this.npcID = npcID;
+			}
+		}
+		
+		// Only store the info we need
+		public static class NPC {
+			public int sprite, direction;
+			public NPC(int sprite, String direction) {
+				this.sprite = sprite;
+				direction = direction.toLowerCase();
+				if (direction.equals("up"))
+					this.direction = 0;
+				else if (direction.equals("right"))
+					this.direction = 1;
+				else if (direction.equals("down"))
+					this.direction = 2;
+				else
+					this.direction = 3;
 			}
 		}
 
