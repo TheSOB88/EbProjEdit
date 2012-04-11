@@ -168,7 +168,8 @@ public class MainGUI implements ActionListener, WindowListener {
         toolbar.setRollover(true);
         toolbar.add(genTopButton("Open24.gif", "Open Project", "open"));
         toolbar.add(saveB = genTopButton("Save24.gif", "Save Project", "save"));
-        toolbar.add(saveAsB = genTopButton("SaveAs24.gif", "Save Project As...", "saveAs"));
+        saveAsB = genTopButton("SaveAs24.gif", "Save Project As...", "saveAs");
+        //toolbar.add(saveAsB);
         panel = new JPanel();
         panel.add(toolbar);
         

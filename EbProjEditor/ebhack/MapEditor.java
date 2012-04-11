@@ -57,7 +57,6 @@ import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
 public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener {
-	
 	private JTextField xField, yField;
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
@@ -152,8 +151,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		radioButton.setSelected(true);
 		radioButton.setActionCommand("mode7");
 		radioButton.addActionListener(this);
-		//group.add(radioButton);
-		//modeMenu.add(radioButton);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
 		menuBar.add(modeMenu);
 
 		menu = new JMenu("Tools");
@@ -163,12 +162,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Clear Map", 'm', null,
 				"delAllMap", this));
-		//menu.add(ToolModule.createJMenuItem("Delete All Sprites", 's', null,
-		//		"delAllSprites", this));
-		//menu.add(ToolModule.createJMenuItem("Delete All Doors", 'o', null,
-		//		"delAllDoors", this));
-		//menu.add(ToolModule.createJMenuItem("Clear Enemy Placements", 'e', null,
-		//		"delAllEnemies", this));
+		menu.add(ToolModule.createJMenuItem("Delete All Sprites", 's', null,
+				"delAllSprites", this));
+		menu.add(ToolModule.createJMenuItem("Delete All Doors", 'o', null,
+				"delAllDoors", this));
+		menu.add(ToolModule.createJMenuItem("Clear Enemy Placements", 'e', null,
+				"delAllEnemies", this));
+		menu.add(ToolModule.createJMenuItem("Delete/Clear All Of The Above", 'a', null,
+				"delAllEverything", this));
 		menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Clear Tile Image Cache", 't',
 				null, "resetTileImages", this));
@@ -359,11 +360,22 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private boolean editMap = true;
 		private boolean drawSprites = true, editSprites = false;
 		private boolean drawDoors = true, editDoors = false, seekDoor = false;
+		private boolean drawEnemies = false, editEnemies = false;
+		
+		// Cache enemy colors
+		public static Color[] enemyColors = null;
 		
 		private TileSelector tileSelector;
 		
 		public MapDisplay(MapData map, JMenuItem copySector, JMenuItem pasteSector) {
 			super();
+			
+			if (enemyColors == null) {
+				enemyColors = new Color[203];
+				for (int i = 0; i < 203; ++i)
+					enemyColors[i] = new Color(((int) (Math.E * 0x100000 * i)) & 0xffffff);
+			}
+			
 			this.map = map;
 			this.copySector = copySector;
 			this.pasteSector = pasteSector;
@@ -433,7 +445,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 		
 		private void drawMap(Graphics2D g) {
-			int i, j;
+			int i, j, a;
 			g.setPaint(Color.white);
 			g.setFont(new Font("Arial", Font.PLAIN, 12));
 			
@@ -565,6 +577,41 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					g.setPaint(Color.MAGENTA);
 					g.draw(new Rectangle2D.Double(
 							seekDrawX + 2, seekDrawY + 2, 6, 6));
+				}
+			}
+			
+			if (drawEnemies) {
+				g.setFont(new Font("Arial", Font.PLAIN, 12));
+				String message;
+				Rectangle2D rect;
+				for (i = -(y%2); i < screenHeight; i += 2) {
+					for (j = -(x%2); j < screenWidth; j += 2) {
+						a = map.getMapEnemyGroup((x+j)/2, (y+i)/2);
+						if (a != 0) {
+							g.setComposite(AlphaComposite.getInstance(
+									AlphaComposite.SRC_OVER, 0.5F));
+							g.setPaint(enemyColors[a]);
+							g.fill(new Rectangle2D.Double(
+									j * MapData.TILE_WIDTH + 1,
+									i * MapData.TILE_HEIGHT + 1,
+									MapData.TILE_WIDTH*2, MapData.TILE_HEIGHT*2));
+							
+							g.setComposite(AlphaComposite.getInstance(
+									AlphaComposite.SRC_OVER, 1.0F));
+							g.setPaint(Color.black);
+							message = addZeros(Integer.toString(a), 3);
+							rect = g.getFontMetrics().getStringBounds(message, g);
+							rect.setRect(
+									j * MapData.TILE_WIDTH + 1,
+									i * MapData.TILE_HEIGHT + 1,
+									rect.getWidth(), rect.getHeight());
+							g.fill(rect);
+							g.setPaint(Color.white);
+							g.drawString(message,
+									(float) (j * MapData.TILE_WIDTH + 1),
+									(float) (i * MapData.TILE_HEIGHT + rect.getHeight()));
+						}
+					}
 				}
 			}
 		}
@@ -736,6 +783,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					doorSeeker = null;
 					changeMode(previousMode);
 					repaint();
+				} else if (editEnemies) {
+					int eX = ((e.getX() - 1) / MapData.TILE_WIDTH + x)/2;
+					int eY = ((e.getY() - 1) / MapData.TILE_HEIGHT + y)/2;
+					if (e.isShiftDown()) {
+						tileSelector.selectTile(map.getMapEnemyGroup(eX, eY));
+					} else {
+						map.setMapEnemyGroup(eX, eY, tileSelector.getSelectedTile());
+						repaint();
+					}
 				}
 			}
 		}
@@ -928,6 +984,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				drawDoors = false;
 				editDoors = false;
 				seekDoor = false;
+				drawEnemies = false;
+				editEnemies = false;
 			} else if (mode == 1) {
 				previousMode = mode;
 				// Sprite Mode
@@ -937,6 +995,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				drawDoors = false;
 				editDoors = false;
 				seekDoor = false;
+				drawEnemies = false;
+				editEnemies = false;
 			} else if (mode == 2) {
 				previousMode = mode;
 				// Door Mode
@@ -946,6 +1006,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				drawDoors = true;
 				editDoors = true;
 				seekDoor = false;
+				drawEnemies = false;
+				editEnemies = false;
 			} else if (mode == 4) {
 				// Seek Door Mode
 				editMap = false;
@@ -954,6 +1016,19 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				drawDoors = true;
 				editDoors = false;
 				seekDoor = true;
+				drawEnemies = false;
+				editEnemies = false;
+			} else if (mode == 7) {
+				previousMode = mode;
+				// Enemy Mode
+				editMap = false;
+				drawSprites = false;
+				editSprites = false;
+				drawDoors = false;
+				editDoors = false;
+				seekDoor = false;
+				drawEnemies = true;
+				editEnemies = true;
 			}
 		}
 		
@@ -983,7 +1058,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	
     private class TileSelector extends AbstractButton implements MouseListener, AdjustmentListener {
     	private int width, height;
-    	private int tile = 0;
+    	private int tile = 0, mode = 0;
     	private JScrollBar scroll;
     	
     	public TileSelector(int width, int height) {
@@ -999,7 +1074,25 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					width * MapData.TILE_WIDTH + 3,
 					height * MapData.TILE_HEIGHT + 3));
 			
+			changeMode(0);
+			
 			this.addMouseListener(this);
+    	}
+    	
+    	public void changeMode(int mode) {
+    		this.mode = mode;
+    		tile = 0;
+			if (mode == 7) {
+				scroll.setEnabled(true);
+				scroll.setMaximum(203 / (height) + 1);
+				tile = Math.min(202, tile);
+			}else if (mode == 0) {
+				scroll.setEnabled(true);
+				scroll.setMaximum(1024 / (height) + 1);
+			} else {
+				scroll.setEnabled(false);
+				scroll.setMaximum(0);
+			}
     	}
     	
     	public void selectTile(int tile) {
@@ -1024,10 +1117,51 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			Graphics2D g2d = (Graphics2D) g;
 
 			if (isEnabled()) {
-				drawTiles(g2d);
+				if (mode == 0)
+					drawTiles(g2d);
+				else if (mode == 7)
+					drawEnemies(g2d);
 				drawGrid(g2d);
 			} else {
 				scroll.setEnabled(false);
+			}
+		}
+		
+		private void drawEnemies(Graphics2D g) {
+			int dtile;
+			String message;
+			Rectangle2D rect;
+			for (int i = 0; i < width; i++) {
+				for (int j = 0; j < height; j++) {
+					dtile = (i+scroll.getValue())*height+j;
+					if (dtile < 203) {
+						g.setPaint(MapDisplay.enemyColors[dtile]);
+						g.fill(new Rectangle2D.Double(
+								i * MapData.TILE_WIDTH + 1,
+								j * MapData.TILE_HEIGHT + 1,
+								MapData.TILE_WIDTH, MapData.TILE_HEIGHT));
+						
+						g.setPaint(Color.black);
+						message = addZeros(Integer.toString(dtile), 3);
+						rect = g.getFontMetrics().getStringBounds(message, g);
+						rect.setRect(
+								i * MapData.TILE_WIDTH + 1,
+								j * MapData.TILE_HEIGHT + 1,
+								rect.getWidth(), rect.getHeight());
+						g.fill(rect);
+						g.setPaint(Color.white);
+						g.drawString(message,
+								(float) (i * MapData.TILE_WIDTH + 1),
+								(float) (j * MapData.TILE_HEIGHT + rect.getHeight()));
+						if (dtile == tile) {
+							g.setPaint(Color.yellow);
+							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
+							g.fillRect(i*MapData.TILE_WIDTH + 1, j*MapData.TILE_HEIGHT + 1,
+									MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
+							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
+						}
+					}
+				}
 			}
 		}
 		
@@ -1087,6 +1221,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			if ((e.getButton() == MouseEvent.BUTTON1) && isEnabled()) {
 				tile = (((e.getX()-1) / MapData.TILE_WIDTH) + scroll.getValue()) * height
 							+ ((e.getY()-1) / MapData.TILE_HEIGHT);
+				if (mode == 0)
+					tile = Math.min(tile, 1023);
+				else if (mode == 7)
+					tile = Math.min(tile, 202);
 				repaint();
 				if (e.isShiftDown()) {
 					ebhack.Ebhack.main.showModule(
@@ -1128,6 +1266,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private NPC[] npcs;
 		private static Image[][] spriteGroups = new Image[464][4];
 		private static int[][] spriteGroupDims = new int[464][2];
+		private int[][] enemyPlacement;
 		
 		public MapData() {
 			reset();
@@ -1150,6 +1289,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			npcs = new NPC[1584];
 			spriteGroups = new Image[464][4];
 			spriteGroupDims = new int[464][2];
+			enemyPlacement = new int[HEIGHT_IN_TILES/2][WIDTH_IN_TILES/2];
 		}
 		
 		public void load(Project proj) {
@@ -1157,6 +1297,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			importSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
 			importSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
 			importDoors(new File(proj.getFilename("eb.DoorModule", "map_doors")));
+			importEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
 			
 			// Read the read-only data
 			importNPCs(new File(proj.getFilename("eb.MiscTablesModule", "npc_config_table")));
@@ -1168,6 +1309,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			exportSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
 			exportSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
 			exportDoors(new File(proj.getFilename("eb.DoorModule", "map_doors")));
+			exportEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
 		}
 		
 		public NPC getNPC(int n) {
@@ -1248,6 +1390,16 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void pushDoorFromCoords(Door door, int areaX, int areaY) {
 			if ((areaX >= 0) && (areaY >= 0))
 				doorAreas[areaY][areaX].add(door);
+		}
+		
+		// Enemy Editing
+		
+		public int getMapEnemyGroup(int x, int y) {
+			return enemyPlacement[y][x];
+		}
+		
+		public void setMapEnemyGroup(int x, int y, int val) {
+			enemyPlacement[y][x] = val;
 		}
 		
 		// Other
@@ -1554,6 +1706,50 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 		}
 		
+		private void importEnemyPlacement(File f) {
+			InputStream input;
+			try {
+				input = new FileInputStream(f);
+				Yaml yaml = new Yaml();
+				Map<Integer, Map<String, Integer>> enemiesMap = (Map<Integer, Map<String, Integer>>) yaml.load(input);
+				
+				int y, x;
+				Sector sec;
+				for (Map.Entry<Integer, Map<String, Integer>> entry: enemiesMap.entrySet()) {
+					y = entry.getKey() / (WIDTH_IN_TILES/2);
+					x = entry.getKey() % (WIDTH_IN_TILES/2);
+					enemyPlacement[y][x] = entry.getValue().get("Enemy Map Group");
+				}
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		private void exportEnemyPlacement(File f) {
+			Map<Integer, Map<String, Integer>> enemiesMap = new HashMap<Integer, Map<String, Integer>>();
+			int i = 0;
+			for (int[] row: enemyPlacement) {
+				for (int ep: row) {
+					Map<String, Integer> entry = new HashMap<String, Integer>();
+					entry.put("Enemy Map Group", ep);
+					enemiesMap.put(i, entry);
+					++i;
+				}
+			}
+			
+			try {
+				FileWriter fw = new FileWriter(f);
+				DumperOptions options = new DumperOptions();
+			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
+			    Yaml yaml = new Yaml(options);
+	        	yaml.dump(enemiesMap, fw);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
 		private void importSectors(File f) {
 			InputStream input;
 			try {
@@ -1704,8 +1900,11 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 
 		public void nullSpriteData() {
-			// TODO Auto-generated method stub
-			
+			for (List<SpriteEntry>[] row : spriteAreas) {
+				for (List<SpriteEntry> area : row) {
+					area.clear();
+				}
+			}
 		}
 
 		public void nullMapData() {
@@ -1722,13 +1921,17 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 
 		public void nullEnemyData() {
-			// TODO Auto-generated method stub
-			
+			for (int i = 0; i < enemyPlacement.length; ++i)
+				for (int j = 0; j < enemyPlacement[i].length; ++j)
+					enemyPlacement[i][j] = 0;
 		}
 
 		public void nullDoorData() {
-			// TODO Auto-generated method stub
-			
+			for (List<Door>[] row : doorAreas) {
+				for (List<Door> area : row) {
+					area.clear();
+				}
+			}
 		}
 	}
 
@@ -1837,19 +2040,27 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
         } else if (e.getActionCommand().equals("mode0")) {
 			mapDisplay.changeMode(0);
 			mapDisplay.repaint();
+			tileSelector.changeMode(0);
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("mode1")) {
 			mapDisplay.changeMode(1);
 			mapDisplay.repaint();
+			tileSelector.changeMode(1);
+			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("mode2")) {
 			mapDisplay.changeMode(2);
 			mapDisplay.repaint();
+			tileSelector.changeMode(2);
+			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("mode6")) {
 			mapDisplay.changeMode(6);
 			mapDisplay.repaint();
+			tileSelector.changeMode(6);
+			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("mode7")) {
 			mapDisplay.changeMode(7);
 			mapDisplay.repaint();
+			tileSelector.changeMode(7);
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("delAllSprites")) {
 			int sure = JOptionPane.showConfirmDialog(mainWindow,
@@ -1884,13 +2095,21 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				map.nullEnemyData();
 				mapDisplay.repaint();
 			}
+		} else if (e.getActionCommand().equals("delAllEverything")) {
+			int sure = JOptionPane.showConfirmDialog(mainWindow,
+					"Are you sure you want to all of the map data?",
+					"Are you sure?", JOptionPane.YES_NO_OPTION);
+			if (sure == JOptionPane.YES_OPTION) {
+				map.nullMapData();
+				map.nullSpriteData();
+				map.nullDoorData();
+				map.nullEnemyData();
+				mapDisplay.repaint();
+			}
 		} else if (e.getActionCommand().equals("resetTileImages")) {
 			mapDisplay.resetTileImageCache();
-			// TODO
-			/*if (gfxcontrol.getModeProps()[1] >= 2) {
-				mapDisplay.repaint();
-				mapDisplay.getTileChooser().repaint();
-			}*/
+			mapDisplay.repaint();
+			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("grid")) {
 			mapDisplay.toggleGrid();
 			mapDisplay.repaint();
