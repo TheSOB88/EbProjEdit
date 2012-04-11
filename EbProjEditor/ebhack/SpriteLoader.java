@@ -9,9 +9,9 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 public class SpriteLoader extends ToolModule {
-	private static Image[][] sprites;
-	private static int[] widths;
-	private static int[] heights;
+	private static Image[][] sprites = new Image[464][4];;
+	private static int[] widths = new int[464];
+	private static int[] heights = new int[464];
 
 	public SpriteLoader(YMLPreferences prefs) {
 		super(prefs);
@@ -49,9 +49,6 @@ public class SpriteLoader extends ToolModule {
 
 	public void load(Project proj) {
 		int w, h, x, y, z;
-		sprites = new Image[464][4];
-		widths = new int[464];
-		heights = new int[464];
 		for (int i = 0; i < sprites.length; ++i) {
 			sprites[i] = new Image[4];
 			try {

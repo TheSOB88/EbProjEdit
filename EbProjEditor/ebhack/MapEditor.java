@@ -15,9 +15,11 @@ import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
+import javax.imageio.ImageIO;
 import javax.swing.AbstractButton;
 import javax.swing.ButtonGroup;
 import javax.swing.JCheckBoxMenuItem;
@@ -41,6 +44,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollBar;
 import javax.swing.JSeparator;
@@ -132,8 +136,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		radioButton.setSelected(false);
 		radioButton.setActionCommand("mode1");
 		radioButton.addActionListener(this);
-		//group.add(radioButton);
-		//modeMenu.add(radioButton);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
 		radioButton = new JRadioButtonMenuItem("Door Edit");
 		radioButton.setSelected(true);
 		radioButton.setActionCommand("mode2");
@@ -184,7 +188,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		checkBox.setSelected(true);
 		checkBox.setActionCommand("spriteboxes");
 		checkBox.addActionListener(this);
-		//menu.add(checkBox);
+		menu.add(checkBox);
 		checkBox = new JCheckBoxMenuItem("Show Enemy Sprites");
 		checkBox.setMnemonic('e');
 		checkBox.setSelected(true);
@@ -296,7 +300,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			mainWindow.setVisible(false);
 	}
 	
-	public static class MapDisplay extends AbstractButton implements MouseListener {
+	public static class MapDisplay extends AbstractButton implements ActionListener, MouseListener, MouseMotionListener {
 		private MapData map;
 		private JMenuItem copySector, pasteSector;
 		
@@ -314,7 +318,24 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private int sectorX, sectorY;
 		private int sectorPal;
 		private boolean grid = true;
-		private boolean drawSprites = true;
+		private boolean spriteBoxes = true;
+		
+		// Moving stuff
+		private int movingDrawX, movingDrawY;
+		private int movingNPC = -1;
+		private Image movingNPCimg;
+		private int[] movingNPCdim;
+		
+		// Popup menus
+		private int popupX, popupY;
+		private JPopupMenu spritePopupMenu;
+		private JMenuItem delNPC, cutNPC, copyNPC, switchNPC;
+		private int copiedNPC = 0;
+		private MapData.SpriteEntry popupSE;
+		
+		// Mode settings
+		private boolean editMap = true;
+		private boolean drawSprites = true, editSprites = false;
 		
 		private TileSelector tileSelector;
 		
@@ -327,7 +348,23 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			if (tileImageCache == null)
 				resetTileImageCache();
 			
+			// Create Sprite popup menu
+			spritePopupMenu = new JPopupMenu();
+			spritePopupMenu.add(ToolModule.createJMenuItem("New NPC",
+						'a', null, "newNPC", this));
+			spritePopupMenu.add(delNPC = ToolModule.createJMenuItem("Delete NPC",
+					'd', null, "delNPC", this));
+			spritePopupMenu.add(cutNPC = ToolModule.createJMenuItem("Cut NPC",
+					'u', null, "cutNPC", this));
+			spritePopupMenu.add(copyNPC = ToolModule.createJMenuItem("Copy NPC",
+					'c', null, "copyNPC", this));
+			spritePopupMenu.add(ToolModule.createJMenuItem("Paste NPC",
+					'p', null, "pasteNPC", this));
+			spritePopupMenu.add(switchNPC = ToolModule.createJMenuItem("Switch NPC",
+					'p', null, "switchNPC", this));
+			
 			addMouseListener(this);
+			addMouseMotionListener(this);
 			
 			setPreferredSize(new Dimension(
 					screenWidth * MapData.TILE_WIDTH + 2,
@@ -336,6 +373,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		public void init() {
 			selectSector(0,0);
+			changeMode(0);
 		}
 		
 		public void setTileSelector(TileSelector tileSelector) {
@@ -381,7 +419,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			if (grid)
 				drawGrid(g);
 			
-			if (selectedSector != null) {
+			if (editMap && (selectedSector != null)) {
 				int sXt, sYt;
 				if (((sXt = sectorX * MapData.SECTOR_WIDTH) + MapData.SECTOR_WIDTH >= x)
 						&& (sXt < x+screenWidth)
@@ -395,10 +433,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							MapData.SECTOR_HEIGHT * MapData.TILE_HEIGHT));
 				}
 			}
-			
-			MapData.NPC npc;
-			int w, h;
+
 			if (drawSprites) {
+				MapData.NPC npc;
+				int[] wh;
 				g.setPaint(Color.RED);
 				List<MapData.SpriteEntry> area;
 				for (int i = y&(~7); i < (y&(~7)) + screenHeight + 8; i += 8) {
@@ -407,15 +445,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							area = map.getSpriteArea(j>>3, i>>3);
 							for (MapData.SpriteEntry e : area) {
 								npc = map.getNPC(e.npcID);
-								w = SpriteLoader.getSpriteW(npc.sprite);
-								h = SpriteLoader.getSpriteH(npc.sprite);
-								g.draw(new Rectangle2D.Double(
-										e.x + (j-x)*MapData.TILE_WIDTH - w/2,
-										e.y + (i-y)*MapData.TILE_HEIGHT - h/2,
-										w, h));
-								g.drawImage(SpriteLoader.getSprite(npc.sprite, npc.direction),
-										e.x + (j-x)*MapData.TILE_WIDTH - w/2,
-										e.y + (i-y)*MapData.TILE_HEIGHT - h/2,
+								wh = map.getSpriteWH(npc.sprite);
+								if (spriteBoxes)
+									g.draw(new Rectangle2D.Double(
+											e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
+											e.y + (i-y)*MapData.TILE_HEIGHT - wh[1]/2,
+											wh[0], wh[1]));
+								g.drawImage(map.getSpriteImage(npc.sprite, npc.direction),
+										e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
+										e.y + (i-y)*MapData.TILE_HEIGHT - wh[1]/2,
 										this);
 							}
 						} catch (Exception e) {
@@ -423,19 +461,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 						}
 					}
 				}
+				
+				if (editSprites && (movingNPC != -1)) {
+					if (spriteBoxes)
+						g.draw(new Rectangle2D.Double(
+								movingDrawX, movingDrawY,
+								movingNPCdim[0], movingNPCdim[1]));
+					g.drawImage(movingNPCimg, movingDrawX, movingDrawY, this);
+				}
 			}
-		}
-		
-		private void drawSprite(Graphics2D g, int n, int dir, int x, int y) {
-			g.setColor(Color.red);
-			int w = SpriteLoader.getSpriteW(n), h = SpriteLoader.getSpriteH(n);
-			g.draw(new Rectangle2D.Double(
-					x - w/2, y - h/2, w, h));
-			
-			g.drawImage(SpriteLoader.getSprite(n, dir),
-					x - SpriteLoader.getSpriteW(n)/2,
-					y - SpriteLoader.getSpriteH(n)/2,
-					this);
 		}
 		
 		private void drawGrid(Graphics2D g) {
@@ -544,34 +578,129 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			// Make sure they didn't click on the border
 			if ((e.getX() >= 1) && (e.getX() <= screenWidth * MapData.TILE_WIDTH + 2)
 					&& (e.getY() >= 1) && (e.getY() <= screenHeight * MapData.TILE_HEIGHT + 2)) {
-				if (e.getButton() == MouseEvent.BUTTON1) {
-					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
-					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
-					if (e.isShiftDown()) {
-						tileSelector.selectTile(map.getMapTile(mX, mY));
-					} else {
-						map.setMapTile(mX, mY, tileSelector.getSelectedTile());
+				if (editMap) {
+					if (e.getButton() == MouseEvent.BUTTON1) {
+						int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
+						int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
+						if (e.isShiftDown()) {
+							tileSelector.selectTile(map.getMapTile(mX, mY));
+						} else {
+							map.setMapTile(mX, mY, tileSelector.getSelectedTile());
+							repaint();
+						}
+					} else if (e.getButton() == MouseEvent.BUTTON3) {
+						// Make sure they didn't click on the border
+						int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH)) / MapData.SECTOR_WIDTH;
+						int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT)) / MapData.SECTOR_HEIGHT;
+						selectSector(sX, sY);
+					}
+				} else if (editSprites) {
+					if (e.getButton() == MouseEvent.BUTTON3) {
+						popupX = e.getX();
+						popupY = e.getY();
+						popupSE = getSpriteEntryFromMouseXY(e.getX(), e.getY());
+						if (popupSE == null) {
+							delNPC.setEnabled(false);
+							cutNPC.setEnabled(false);
+							copyNPC.setEnabled(false);
+							switchNPC.setText("Switch NPC");
+							switchNPC.setEnabled(false);
+						} else {
+							delNPC.setEnabled(true);
+							cutNPC.setEnabled(true);
+							copyNPC.setEnabled(true);
+							switchNPC.setText("Switch NPC (" + popupSE.npcID + ")");
+							switchNPC.setEnabled(true);
+						}
+						spritePopupMenu.show(this, e.getX(), e.getY());
+					}
+				}
+			}
+		}
+		
+		public void actionPerformed(ActionEvent ae) {
+			if (ae.getActionCommand().equals("newNPC")) {
+				pushNpcIdFromMouseXY(0, popupX, popupY);
+				repaint();
+			} else if (ae.getActionCommand().equals("delNPC")) {
+				popNpcIdFromMouseXY(popupX, popupY);
+				repaint();
+			} else if (ae.getActionCommand().equals("cutNPC")) {
+				copiedNPC = popNpcIdFromMouseXY(popupX, popupY);
+				repaint();
+			} else if (ae.getActionCommand().equals("copyNPC")) {
+				copiedNPC = popupSE.npcID;
+				repaint();
+			} else if (ae.getActionCommand().equals("pasteNPC")) {
+				pushNpcIdFromMouseXY(copiedNPC, popupX, popupY);
+				repaint();
+			} else if (ae.getActionCommand().equals("switchNPC")) {
+				String input = JOptionPane.showInputDialog(this,
+								"Switch this to a different NPC",
+								popupSE.npcID);
+				if (input != null) {
+					popupSE.npcID = Integer.parseInt(input);
+					repaint();
+				}
+			}
+		}
+		
+		private MapData.SpriteEntry getSpriteEntryFromMouseXY(int mouseX, int mouseY) {
+			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
+					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
+			mouseX += (x%8) * MapData.TILE_WIDTH;
+			mouseX %= (MapData.TILE_WIDTH * 8);
+			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY %= (MapData.TILE_HEIGHT * 8);
+			return map.getSpriteEntryFromCoords(areaX, areaY, mouseX, mouseY);
+		}
+
+		private int popNpcIdFromMouseXY(int mouseX, int mouseY) {
+			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
+					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
+			mouseX += (x%8) * MapData.TILE_WIDTH;
+			mouseX %= (MapData.TILE_WIDTH * 8);
+			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY %= (MapData.TILE_HEIGHT * 8);
+			return map.popNPCFromCoords(areaX, areaY, mouseX, mouseY);
+		}
+		
+		private void pushNpcIdFromMouseXY(int npc, int mouseX, int mouseY) {
+			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
+					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
+			mouseX += (x%8) * MapData.TILE_WIDTH;
+			mouseX %= (MapData.TILE_WIDTH * 8);
+			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY %= (MapData.TILE_HEIGHT * 8);
+			map.pushNPCFromCoords(npc, areaX, areaY, mouseX, mouseY);
+		}
+		
+		public void mousePressed(MouseEvent e) {
+			int mx = e.getX(), my = e.getY();
+			if (e.getButton() == 1) {
+				if (editSprites && (movingNPC == -1)) {
+					movingNPC = popNpcIdFromMouseXY(mx, my);
+					if (movingNPC != -1) {
+						MapData.NPC tmp = map.getNPC(movingNPC);
+						movingNPCimg = map.getSpriteImage(tmp.sprite, tmp.direction);
+						movingNPCdim = map.getSpriteWH(tmp.sprite);
+						movingDrawX = mx - movingNPCdim[0]/2;
+						movingDrawY = my - movingNPCdim[1]/2;
 						repaint();
 					}
-				} else if (e.getButton() == MouseEvent.BUTTON3) {
-					// Make sure they didn't click on the border
-					int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH)) / MapData.SECTOR_WIDTH;
-					int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT)) / MapData.SECTOR_HEIGHT;
-					selectSector(sX, sY);
 				}
 			}
 		}
 
-		@Override
-		public void mousePressed(MouseEvent e) {
-			// TODO Auto-generated method stub
-			
-		}
-
-		@Override
 		public void mouseReleased(MouseEvent e) {
-			// TODO Auto-generated method stub
-			
+			int mx = e.getX(), my = e.getY();
+			if (e.getButton() == 1) {
+				if (editSprites && (movingNPC != -1)) {
+					pushNpcIdFromMouseXY(movingNPC, mx, my);
+					movingNPC = -1;
+					repaint();
+				}
+			}
 		}
 
 		@Override
@@ -586,9 +715,32 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			
 		}
 
-		public void changeMode(int i) {
+		public void mouseDragged(MouseEvent e) {
+			if (movingNPC != -1) {
+				movingDrawX = e.getX() - movingNPCdim[0]/2;
+				movingDrawY = e.getY() - movingNPCdim[1]/2;
+				repaint();
+			}
+		}
+
+		@Override
+		public void mouseMoved(MouseEvent e) {
 			// TODO Auto-generated method stub
 			
+		}
+
+		public void changeMode(int mode) {
+			if (mode == 0) {
+				// Map Mode
+				editMap = true;
+				drawSprites = false;
+				editSprites = false;
+			} else if (mode == 1) {
+				// Sprite Mode
+				editMap = false;
+				drawSprites = true;
+				editSprites = true;
+			}
 		}
 
 		public void toggleGrid() {
@@ -596,8 +748,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		}
 
 		public void toggleSpriteBoxes() {
-			// TODO Auto-generated method stub
-			
+			spriteBoxes = !spriteBoxes;
 		}
 
 		public void toggleMapChanges() {
@@ -748,11 +899,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private Sector[][] sectors;
 		private ArrayList<SpriteEntry>[][] spriteAreas;
 		private NPC[] npcs;
+		private static Image[][] spriteGroups = new Image[464][4];
+		private static int[][] spriteGroupDims = new int[464][2];
 		
 		public MapData() {
 			reset();
 		}
-		
+
 		public void reset() {
 			mapTiles = new int[HEIGHT_IN_TILES][WIDTH_IN_TILES];
 			sectors = new Sector[HEIGHT_IN_SECTORS][WIDTH_IN_SECTORS];
@@ -764,22 +917,66 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				for (int j = 0; j < spriteAreas[i].length; ++j)
 					spriteAreas[i][j] = new ArrayList<SpriteEntry>();
 			npcs = new NPC[1584];
+			spriteGroups = new Image[464][4];
+			spriteGroupDims = new int[464][2];
 		}
 		
 		public void load(Project proj) {
 			importMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
 			importSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
 			importSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
+			
+			// Read the read-only data
 			importNPCs(new File(proj.getFilename("eb.MiscTablesModule", "npc_config_table")));
+			importSpriteGroups(proj);
 		}
 		
 		public void save(Project proj) {
 			exportMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
 			exportSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
+			exportSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
 		}
 		
 		public NPC getNPC(int n) {
 			return npcs[n];
+		}
+		
+		public int[] getSpriteWH(int n) {
+			return spriteGroupDims[n];
+		}
+		
+		public SpriteEntry getSpriteEntryFromCoords(int areaX, int areaY, int x, int y) {
+			int[] wh;
+			NPC npc;
+			for (SpriteEntry e : spriteAreas[areaY][areaX]) {
+				npc = npcs[e.npcID];
+				wh = spriteGroupDims[npc.sprite];
+				if ((e.x >= x - wh[0]/2) && (e.x <= x + wh[0]/2)
+						&& (e.y >= y - wh[1]/2) && (e.y <= y + wh[1]/2)) {
+					return e;
+				}
+			}
+			return null;
+		}
+		
+		public int popNPCFromCoords(int areaX, int areaY, int x, int y) {
+			int[] wh;
+			NPC npc;
+			for (SpriteEntry e : spriteAreas[areaY][areaX]) {
+				npc = npcs[e.npcID];
+				wh = spriteGroupDims[npc.sprite];
+				if ((e.x >= x - wh[0]/2) && (e.x <= x + wh[0]/2)
+						&& (e.y >= y - wh[1]/2) && (e.y <= y + wh[1]/2)) {
+					spriteAreas[areaY][areaX].remove(e);
+					return e.npcID;
+				}
+			}
+			return -1;
+		}
+		
+		public void pushNPCFromCoords(int npcid, int areaX, int areaY, int x, int y) {
+			if ((areaX >= 0) && (areaY >= 0))
+				spriteAreas[areaY][areaX].add(new SpriteEntry(x, y, npcid));
 		}
 		
 		public Sector getSector(int sectorX, int sectorY) {
@@ -788,6 +985,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		public List<SpriteEntry> getSpriteArea(int areaX, int areaY) {
 			return spriteAreas[areaY][areaX];
+		}
+		
+		public Image getSpriteImage(int sprite, int direction) {
+			return spriteGroups[sprite][direction];
 		}
 		
 		private void importMapTiles(File f) {
@@ -835,6 +1036,38 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 		}
 		
+		private void importSpriteGroups(Project proj) {
+			int w, h, x, y, z;
+			for (int i = 0; i < spriteGroups.length; ++i) {
+				spriteGroups[i] = new Image[4];
+				try {
+					BufferedImage sheet = ImageIO.read(new File(proj.getFilename(
+							"eb.SpriteGroupModule",
+							"SpriteGroups/" + ToolModule.addZeros(i+"", 3))));
+					Graphics2D sg = sheet.createGraphics();
+					
+					w = sheet.getWidth()/4;
+					h = sheet.getHeight()/4;
+					spriteGroupDims[i] = new int[] { w, h };
+					z = 0;
+					for (y=0; y<2; ++y) {
+						for (x=0; x<4; x += 2) {
+							BufferedImage sp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+							Graphics2D g = sp.createGraphics();
+							g.setComposite(sg.getComposite());
+							g.drawImage(sheet, 0, 0, w, h, w*x, h*y, w*x+w, h*y+h, null);
+							g.dispose();
+							spriteGroups[i][z] = sp;
+							++z;
+						}
+					}
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		
 		private void importSpritePlacements(File f) {
 			InputStream input;
 			try {
@@ -860,6 +1093,44 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					}
 				}
 			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		private void exportSpritePlacements(File f) {
+			Map<Integer, Map<Integer, List<Map<String, Integer>>>> spritesMap =
+					new HashMap<Integer, Map<Integer, List<Map<String, Integer>>>>();
+			int x, y = 0;
+			for (List<SpriteEntry>[] row : spriteAreas) {
+				Map<Integer, List<Map<String, Integer>>> rowOut =
+						new HashMap<Integer, List<Map<String, Integer>>>();
+				x = 0;
+				for (List<SpriteEntry> area : row) {
+					List<Map<String, Integer>> areaOut =
+							new ArrayList<Map<String, Integer>>();
+					for (SpriteEntry se : area) {
+						Map<String, Integer> seOut =
+								new HashMap<String, Integer>();
+						seOut.put("X", se.x);
+						seOut.put("Y", se.y);
+						seOut.put("NPC ID", se.npcID);
+						areaOut.add(seOut);
+					}
+					rowOut.put(x, areaOut);
+					++x;
+				}
+				spritesMap.put(y, rowOut);
+				++y;
+			}
+			
+			try {
+				FileWriter fw = new FileWriter(f);
+				DumperOptions options = new DumperOptions();
+			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
+			    Yaml yaml = new Yaml(options);
+	        	yaml.dump(spritesMap, fw);
+			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
@@ -1147,14 +1418,20 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
             hide();
         } else if (e.getActionCommand().equals("mode0")) {
 			mapDisplay.changeMode(0);
+			mapDisplay.repaint();
+			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("mode1")) {
 			mapDisplay.changeMode(1);
+			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("mode2")) {
 			mapDisplay.changeMode(2);
+			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("mode6")) {
 			mapDisplay.changeMode(6);
+			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("mode7")) {
 			mapDisplay.changeMode(7);
+			mapDisplay.repaint();
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("delAllSprites")) {
 			int sure = JOptionPane.showConfirmDialog(mainWindow,
@@ -1201,6 +1478,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("spriteboxes")) {
 			mapDisplay.toggleSpriteBoxes();
+			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("mapchanges")) {
 			mapDisplay.toggleMapChanges();
 		} else if (e.getActionCommand().equals("sectorEdit")) {
