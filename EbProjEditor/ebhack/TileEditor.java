@@ -74,6 +74,7 @@ public class TileEditor extends ToolModule implements ActionListener{
     // TODO use these
     private boolean guiInited = true;
     private boolean paletteIsInited = true;
+    private boolean appliedChanges = false;
 	
 	public TileEditor(YMLPreferences prefs) {
 		super(prefs);
@@ -1157,6 +1158,25 @@ public class TileEditor extends ToolModule implements ActionListener{
 		mainWindow.setVisible(true);
 	}
 	
+	public void show(Object obj) {
+		show();
+        if (obj instanceof int[])
+        {
+            int[] arr = (int[]) obj;
+            tilesetSelector.setSelectedIndex(arr[0]);
+            paletteSelector.setSelectedIndex(arr[1]);
+            arrangementSelector.setCurrentArrangement(arr[2]);
+            if (arr.length > 3)
+            {
+                tileSelector.setCurrentTile(arr[3]);
+                if (arr.length > 4)
+                {
+                    subPaletteSelector.setSelectedIndex(arr[4]);
+                }
+            }
+        }
+	}
+	
 	public void hide() {
 		if (isInited)
 			mainWindow.setVisible(false);
@@ -1229,9 +1249,12 @@ public class TileEditor extends ToolModule implements ActionListener{
 	
 	public void save(Project proj) {
 		// Write FTS data
-		for (int i = 0; i < NUM_TILESETS; i++) {
-			//System.out.println("saving tileset " + i);
-			exportAllTileset(i, new File(proj.getFilename("eb.TilesetModule", "Tilesets/" + addZeros(i+"",2))));
+		if (appliedChanges) {
+			for (int i = 0; i < NUM_TILESETS; i++) {
+				//System.out.println("saving tileset " + i);
+				exportAllTileset(i, new File(proj.getFilename("eb.TilesetModule", "Tilesets/" + addZeros(i+"",2))));
+			}
+			appliedChanges = false;
 		}
 	}
 	
@@ -2653,7 +2676,7 @@ public class TileEditor extends ToolModule implements ActionListener{
         // default window stuff
         else if (ae.getActionCommand().equals("apply"))
         {
-        	// TODO
+        	appliedChanges = true;
         }
         else if (ae.getActionCommand().equals("close"))
         {

@@ -188,7 +188,7 @@ public class MainGUI implements ActionListener, WindowListener {
             	button = new JButton(tm.getDescription());
             	button.setActionCommand("module" + i);
                 button.addActionListener(this);
-                button.setMaximumSize(new Dimension(300, 26));
+                button.setMaximumSize(new Dimension(175, 26));
             	buttons.add(button);
             	moduleButtons.add(button);
             	button.setEnabled(false);
@@ -196,7 +196,8 @@ public class MainGUI implements ActionListener, WindowListener {
         	i++;
         }
         
-        mainWindow.getContentPane().add(scroll, BorderLayout.CENTER);
+        //mainWindow.getContentPane().add(scroll, BorderLayout.CENTER);
+        mainWindow.getContentPane().add(buttons, BorderLayout.CENTER);
         
         statusBar = new JLabel();
         resetStatusBar();
@@ -204,7 +205,7 @@ public class MainGUI implements ActionListener, WindowListener {
         
         mainWindow.invalidate();
         mainWindow.pack();
-        mainWindow.setSize(300, 400);
+        mainWindow.setSize(175, 200);
         mainWindow.setLocationByPlatform(true);
         mainWindow.validate();
         mainWindow.setResizable(false);
