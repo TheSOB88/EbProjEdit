@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
@@ -61,7 +60,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
 	private JMenu modeMenu;
-	private JMenuItem sectorProps, findSprite, copySector, pasteSector, undo;
+	private JMenuItem sectorProps, /*findSprite,*/ copySector, pasteSector, undo;
 	
 	public static MapData map;
 	private MapDisplay mapDisplay;
@@ -141,25 +140,37 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		radioButton.addActionListener(this);
 		group.add(radioButton);
 		modeMenu.add(radioButton);
-		radioButton = new JRadioButtonMenuItem("Hotspot Edit");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode6");
-		radioButton.addActionListener(this);
-		//group.add(radioButton);
-		//modeMenu.add(radioButton);
 		radioButton = new JRadioButtonMenuItem("Enemy Edit");
 		radioButton.setSelected(true);
 		radioButton.setActionCommand("mode7");
 		radioButton.addActionListener(this);
 		group.add(radioButton);
 		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Hotspot Edit");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode6");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Whole View");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode8");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
 		menuBar.add(modeMenu);
+		radioButton = new JRadioButtonMenuItem("Game View");
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode9");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
 
-		menu = new JMenu("Tools");
-		findSprite = ToolModule.createJMenuItem("Find Sprite Entry", 'f',
-				null, "findSprite", this);
-		menu.add(findSprite);
-		menu.add(new JSeparator());
+		menu = new JMenu("Actions");
+		//findSprite = ToolModule.createJMenuItem("Find Sprite Entry", 'f',
+		//		null, "findSprite", this);
+		//menu.add(findSprite);
+		//menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Clear Map", 'm', null,
 				"delAllMap", this));
 		menu.add(ToolModule.createJMenuItem("Delete All Sprites", 's', null,
@@ -188,18 +199,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		checkBox.setActionCommand("spriteboxes");
 		checkBox.addActionListener(this);
 		menu.add(checkBox);
-		checkBox = new JCheckBoxMenuItem("Show Enemy Sprites");
-		checkBox.setMnemonic('e');
-		checkBox.setSelected(true);
-		checkBox.setActionCommand("enemySprites");
-		checkBox.addActionListener(this);
-		//menu.add(checkBox);
-		checkBox = new JCheckBoxMenuItem("Show Enemy Colors");
-		checkBox.setMnemonic('l');
-		checkBox.setSelected(true);
-		checkBox.setActionCommand("enemycolors");
-		checkBox.addActionListener(this);
-		//menu.add(checkBox);
 		checkBox = new JCheckBoxMenuItem("Show Map Changes");
 		checkBox.setMnemonic('c');
 		checkBox.setSelected(false);
@@ -355,12 +354,19 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private int seekDrawX, seekDrawY;
 		private DoorEditor doorSeeker;
 		
+		// Editing hotspot
+		private MapData.Hotspot editHS = null;
+		private int editHSx1, editHSy1;
+		private int hsMouseX, hsMouseY;
+		
 		// Mode settings
 		private int previousMode = 0;
 		private boolean editMap = true;
-		private boolean drawSprites = true, editSprites = false;
-		private boolean drawDoors = true, editDoors = false, seekDoor = false;
+		private boolean drawSprites = false, editSprites = false;
+		private boolean drawDoors = false, editDoors = false, seekDoor = false;
 		private boolean drawEnemies = false, editEnemies = false;
+		private boolean drawHotspots = false, editHotspots = false;
+		private boolean gamePreview = false;
 		
 		// Cache enemy colors
 		public static Color[] enemyColors = null;
@@ -417,8 +423,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			addMouseMotionListener(this);
 			
 			setPreferredSize(new Dimension(
-					screenWidth * MapData.TILE_WIDTH + 3,
-					screenHeight * MapData.TILE_HEIGHT + 3));
+					screenWidth * MapData.TILE_WIDTH + 2,
+					screenHeight * MapData.TILE_HEIGHT + 2));
 		}
 		
 		public void init() {
@@ -468,12 +474,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				}
 			}
 			
-			// Draw border
-			g.setColor(Color.black);
-			g.draw(new Rectangle2D.Double(0, 0,
-					screenWidth * MapData.TILE_WIDTH + 2,
-					screenHeight * MapData.TILE_HEIGHT + 2));
-			if (grid)
+			if (grid && !gamePreview)
 				drawGrid(g);
 			
 			if (editMap && (selectedSector != null)) {
@@ -490,7 +491,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							MapData.SECTOR_HEIGHT * MapData.TILE_HEIGHT));
 				}
 			}
-
+			
+			// Draw border
+			g.setColor(Color.black);
+			g.draw(new Rectangle2D.Double(0, 0,
+					screenWidth * MapData.TILE_WIDTH + 2,
+					screenHeight * MapData.TILE_HEIGHT + 2));
+			
 			if (drawSprites) {
 				MapData.NPC npc;
 				int[] wh;
@@ -503,7 +510,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							for (MapData.SpriteEntry e : area) {
 								npc = map.getNPC(e.npcID);
 								wh = map.getSpriteWH(npc.sprite);
-								if (spriteBoxes)
+								if (spriteBoxes && !gamePreview)
 									g.draw(new Rectangle2D.Double(
 											e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
 											e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 8,
@@ -611,6 +618,44 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 									(float) (j * MapData.TILE_WIDTH + 1),
 									(float) (i * MapData.TILE_HEIGHT + rect.getHeight()));
 						}
+					}
+				}
+			}
+			
+			if (drawHotspots) {
+				MapData.Hotspot hs;
+				g.setPaint(Color.PINK);
+				g.setComposite(AlphaComposite.getInstance(
+						AlphaComposite.SRC_OVER, 0.8F));
+				int tx1, ty1, tx2, ty2;
+				for (i=0; i<map.numHotspots(); ++i) {
+					hs = map.getHotspot(i);
+					if (hs == editHS)
+						continue;
+					tx1 = hs.x1/4 - x; ty1 = hs.y1/4 - y;
+					tx2 = hs.x2/4 - x; ty2 = hs.y2/4 - y;
+					if (((tx1 >= 0) && (tx1 <= screenWidth)
+							&& (ty1 >= 0) && (ty1 <= screenHeight))
+							|| ((tx2 >= 0) && (tx2 <= screenWidth)
+									&& (ty2 >= 0) && (ty2 <= screenHeight))) {
+						g.fill(new Rectangle2D.Double(
+								hs.x1 * 8 - x * MapData.TILE_WIDTH + 1,
+								hs.y1 * 8 - y * MapData.TILE_HEIGHT + 1,
+								(hs.x2 - hs.x1) * 8,
+								(hs.y2 - hs.y1) * 8));
+					}
+				}
+				
+				if (editHotspots && (editHS != null)) {
+					if (editHSx1 != -1) {
+						tx1 = editHSx1 * 8 - x * MapData.TILE_WIDTH + 1;
+						ty1 = editHSy1 * 8 - y * MapData.TILE_HEIGHT + 1;
+						g.fill(new Rectangle2D.Double(
+								tx1, ty1,
+								hsMouseX - tx1, hsMouseY - ty1));
+					} else {
+						g.fill(new Rectangle2D.Double(
+								hsMouseX+1, hsMouseY+1, 65, 65));
 					}
 				}
 			}
@@ -792,6 +837,36 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 						map.setMapEnemyGroup(eX, eY, tileSelector.getSelectedTile());
 						repaint();
 					}
+				} else if (editHotspots) {
+					int mx = ((e.getX() - 1) / 8) + (x * 4),
+							my = ((e.getY() - 1) / 8) + (y * 4);
+					if (editHS != null) {
+						if (editHSx1 == -1) {
+							editHSx1 = mx;
+							editHSy1 = my;
+							repaint();
+						} else {
+							editHS.x1 = editHSx1;
+							editHS.y1 = editHSy1;
+							editHS.x2 = mx;
+							editHS.y2 = my;
+							editHS = null;
+							repaint();
+						}
+					} else {
+						for (int i=0; i<map.numHotspots(); ++i) {
+							MapData.Hotspot hs = map.getHotspot(i);
+							if ((mx >= hs.x1) && (mx <= hs.x2)
+									&& (my >= hs.y1) && (my <= hs.y2)) {
+								editHS = hs;
+								editHSx1 = editHSy1 = -1;
+								hsMouseX = e.getX() & (~7);
+								hsMouseY = e.getY() & (~7);
+								repaint();
+								return;
+							}
+						}
+					}
 				}
 			}
 		}
@@ -971,10 +1046,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				seekDrawX = e.getX() & (~7);
 				seekDrawY = e.getY() & (~7);
 				repaint();
+			} else if (editHotspots && (editHS != null)) {
+				hsMouseX = e.getX() & (~7);
+				hsMouseY = e.getY() & (~7);
+				repaint();
 			}
 		}
 
 		public void changeMode(int mode) {
+			gamePreview = mode == 9;
 			if (mode == 0) {
 				previousMode = mode;
 				// Map Mode
@@ -986,6 +1066,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				seekDoor = false;
 				drawEnemies = false;
 				editEnemies = false;
+				drawHotspots = false;
+				editHotspots = false;
 			} else if (mode == 1) {
 				previousMode = mode;
 				// Sprite Mode
@@ -997,6 +1079,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				seekDoor = false;
 				drawEnemies = false;
 				editEnemies = false;
+				drawHotspots = false;
+				editHotspots = false;
 			} else if (mode == 2) {
 				previousMode = mode;
 				// Door Mode
@@ -1008,6 +1092,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				seekDoor = false;
 				drawEnemies = false;
 				editEnemies = false;
+				drawHotspots = false;
+				editHotspots = false;
 			} else if (mode == 4) {
 				// Seek Door Mode
 				editMap = false;
@@ -1018,6 +1104,21 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				seekDoor = true;
 				drawEnemies = false;
 				editEnemies = false;
+				drawHotspots = false;
+				editHotspots = false;
+			} else if (mode == 6) {
+				previousMode = mode;
+				// Hotspot Mode
+				editMap = false;
+				drawSprites = false;
+				editSprites = false;
+				drawDoors = false;
+				editDoors = false;
+				seekDoor = false;
+				drawEnemies = false;
+				editEnemies = false;
+				drawHotspots = true;
+				editHotspots = true;
 			} else if (mode == 7) {
 				previousMode = mode;
 				// Enemy Mode
@@ -1029,6 +1130,34 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				seekDoor = false;
 				drawEnemies = true;
 				editEnemies = true;
+				drawHotspots = false;
+				editHotspots = false;
+			} else if (mode == 8) {
+				previousMode = mode;
+				// View All
+				editMap = false;
+				drawSprites = true;
+				editSprites = false;
+				drawDoors = true;
+				editDoors = false;
+				seekDoor = false;
+				drawEnemies = true;
+				editEnemies = false;
+				drawHotspots = true;
+				editHotspots = false;
+			} else if (mode == 9) {
+				previousMode = mode;
+				// Preview
+				editMap = false;
+				drawSprites = true;
+				editSprites = false;
+				drawDoors = false;
+				editDoors = false;
+				seekDoor = false;
+				drawEnemies = false;
+				editEnemies = false;
+				drawHotspots = false;
+				editHotspots = false;
 			}
 		}
 		
@@ -1264,9 +1393,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private ArrayList<SpriteEntry>[][] spriteAreas;
 		private ArrayList<Door>[][] doorAreas;
 		private NPC[] npcs;
-		private static Image[][] spriteGroups = new Image[464][4];
-		private static int[][] spriteGroupDims = new int[464][2];
+		private static Image[][] spriteGroups;
+		private static int[][] spriteGroupDims;
 		private int[][] enemyPlacement;
+		private Hotspot[] hotspots; 
 		
 		public MapData() {
 			reset();
@@ -1290,6 +1420,9 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			spriteGroups = new Image[464][4];
 			spriteGroupDims = new int[464][2];
 			enemyPlacement = new int[HEIGHT_IN_TILES/2][WIDTH_IN_TILES/2];
+			hotspots = new Hotspot[56];
+			for (int i = 0; i < hotspots.length; ++i)
+				hotspots[i] = new Hotspot();
 		}
 		
 		public void load(Project proj) {
@@ -1298,6 +1431,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			importSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
 			importDoors(new File(proj.getFilename("eb.DoorModule", "map_doors")));
 			importEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
+			importHotspots(new File(proj.getFilename("eb.MiscTablesModule", "map_hotspots")));
 			
 			// Read the read-only data
 			importNPCs(new File(proj.getFilename("eb.MiscTablesModule", "npc_config_table")));
@@ -1310,6 +1444,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			exportSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
 			exportDoors(new File(proj.getFilename("eb.DoorModule", "map_doors")));
 			exportEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
+			exportHotspots(new File(proj.getFilename("eb.MiscTablesModule", "map_hotspots")));
 		}
 		
 		public NPC getNPC(int n) {
@@ -1400,6 +1535,16 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		public void setMapEnemyGroup(int x, int y, int val) {
 			enemyPlacement[y][x] = val;
+		}
+		
+		// Hotspot
+		
+		public int numHotspots() {
+			return 56;
+		}
+		
+		public Hotspot getHotspot(int n) {
+			return hotspots[n];
 		}
 		
 		// Other
@@ -1706,6 +1851,56 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 		}
 		
+		public static class Hotspot {
+			int x1, y1, x2, y2;
+		}
+		
+		private void importHotspots(File f) {
+			InputStream input;
+			try {
+				input = new FileInputStream(f);
+				Yaml yaml = new Yaml();
+				Map<Integer, Map<String, Integer>> hsMap = (Map<Integer, Map<String, Integer>>) yaml.load(input);
+				
+				int i;
+				for (Map.Entry<Integer, Map<String, Integer>> entry: hsMap.entrySet()) {
+					i = entry.getKey();
+					hotspots[i].x1 = entry.getValue().get("X1");
+					hotspots[i].y1 = entry.getValue().get("Y1");
+					hotspots[i].x2 = entry.getValue().get("X2");
+					hotspots[i].y2 = entry.getValue().get("Y2");
+				}
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		private void exportHotspots(File f) {
+			Map<Integer, Map<String, Integer>> hsMap = new HashMap<Integer, Map<String, Integer>>();
+			int i = 0;
+			for (Hotspot hs: hotspots) {
+				Map<String, Integer> entry = new HashMap<String, Integer>();
+				entry.put("X1", hs.x1);
+				entry.put("Y1", hs.y1);
+				entry.put("X2", hs.x2);
+				entry.put("Y2", hs.y2);
+				hsMap.put(i, entry);
+				++i;
+			}
+			
+			try {
+				FileWriter fw = new FileWriter(f);
+				DumperOptions options = new DumperOptions();
+			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
+			    Yaml yaml = new Yaml(options);
+	        	yaml.dump(hsMap, fw);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
 		private void importEnemyPlacement(File f) {
 			InputStream input;
 			try {
@@ -1714,7 +1909,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				Map<Integer, Map<String, Integer>> enemiesMap = (Map<Integer, Map<String, Integer>>) yaml.load(input);
 				
 				int y, x;
-				Sector sec;
 				for (Map.Entry<Integer, Map<String, Integer>> entry: enemiesMap.entrySet()) {
 					y = entry.getKey() / (WIDTH_IN_TILES/2);
 					x = entry.getKey() % (WIDTH_IN_TILES/2);
@@ -2061,6 +2255,16 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			mapDisplay.changeMode(7);
 			mapDisplay.repaint();
 			tileSelector.changeMode(7);
+			tileSelector.repaint();
+		} else if (e.getActionCommand().equals("mode8")) {
+			mapDisplay.changeMode(8);
+			mapDisplay.repaint();
+			tileSelector.changeMode(8);
+			tileSelector.repaint();
+		} else if (e.getActionCommand().equals("mode9")) {
+			mapDisplay.changeMode(9);
+			mapDisplay.repaint();
+			tileSelector.changeMode(9);
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("delAllSprites")) {
 			int sure = JOptionPane.showConfirmDialog(mainWindow,

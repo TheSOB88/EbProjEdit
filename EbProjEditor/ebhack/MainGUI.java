@@ -327,7 +327,8 @@ public class MainGUI implements ActionListener, WindowListener {
         ListIterator<ToolModule> listIterator = moduleList.listIterator();
         while(listIterator.hasNext()) {
         	ToolModule x = listIterator.next();
-        	System.out.println("Loading " + x.getDescription());
+        	//System.out.println("Loading " + x.getDescription());
+        	setStatusBar("Loading " + x.getDescription() + "...");
         	x.load(project);
         	//listIterator.next().load(project);
         }
