@@ -33,8 +33,11 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
+import javax.swing.JSeparator;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.event.DocumentEvent;
@@ -1017,6 +1020,109 @@ public class TileEditor extends ToolModule implements ActionListener{
 	public void init() {
         mainWindow = createBaseWindow(this);
         mainWindow.setTitle(this.getDescription());
+        
+        // Menu
+        JMenuBar mb = new JMenuBar();
+
+        JMenu fileMenu = new JMenu("File");
+        fileMenu.setMnemonic('f');
+
+        fileMenu.add(ToolModule.createJMenuItem("Apply Changes", 'y', "ctrl S",
+            "apply", this));
+
+        /*fileMenu.addSeparator();
+
+        fileMenu.add(ToolModule.createJMenuItem("Import Minitile...", 'i',
+            null, "importTile", this));
+        fileMenu.add(ToolModule.createJMenuItem("Export Minitile...", 'e',
+            null, "exportTile", this));
+        fileMenu.add(ToolModule.createJMenuItem("Import Palette...", 'm', null,
+            "importPal", this));
+        fileMenu.add(ToolModule.createJMenuItem("Export Palette...", 'o', null,
+            "exportPal", this));
+
+        fileMenu.addSeparator();
+
+        fileMenu.add(ToolModule
+            .createJMenuItem("Import All Tileset Minitiles...", 'm', null,
+                "importTileset", this));
+        fileMenu.add(ToolModule
+            .createJMenuItem("Export All Tileset Minitiles...", 'x', null,
+                "exportTileset", this));
+        fileMenu.add(ToolModule.createJMenuItem(
+            "Import All Tileset Properties...", 'p', null, "importCollision",
+            this));
+        fileMenu.add(ToolModule.createJMenuItem(
+            "Export All Tileset Properties...", 'r', null, "exportCollision",
+            this));
+
+        fileMenu.addSeparator();
+
+        fileMenu.add(ToolModule.createJMenuItem("Import All Tileset Data...",
+            't', null, "importAllTileset", this));
+        fileMenu.add(ToolModule.createJMenuItem("Export All Tileset Data...",
+            's', null, "exportAllTileset", this));
+
+        fileMenu.addSeparator();
+
+        fileMenu.add(ToolModule.createJMenuItem("Import All Tilesets Data...",
+            'a', null, "importAll", this));
+        fileMenu.add(ToolModule.createJMenuItem("Export All Tilesets Data...",
+            'l', null, "exportAll", this));*/
+
+        mb.add(fileMenu);
+
+        JMenu editMenu = ToolModule.createEditMenu(this, true);
+
+        editMenu.add(new JSeparator());
+
+        editMenu.add(ToolModule.createJMenuItem("Cut Both", 'b',
+            "ctrl shift X", "cutBoth", this));
+        editMenu.add(ToolModule.createJMenuItem("Copy Both", 'o',
+            "ctrl shift C", "copyBoth", this));
+        editMenu.add(ToolModule.createJMenuItem("Paste Both", 's',
+            "ctrl shift V", "pasteBoth", this));
+        editMenu.add(ToolModule.createJMenuItem("Delete Both", 'h',
+            "shift DELETE", "deleteBoth", this));
+
+        editMenu.addSeparator();
+
+        editMenu.add(createJMenuItem("Show Multi-Clipboard", 'm', "alt M",
+            "cb_show", this));
+
+        mb.add(editMenu);
+
+        JMenu optionsMenu = new JMenu("Options");
+        optionsMenu.setMnemonic('o');
+        optionsMenu.add(new PrefsCheckBox("Enable Tile Selector Grid Lines",
+            prefs, "eb.TileEditor.tileSelector.gridLines", false, 't', null,
+            "tileSelGridLines", this));
+        optionsMenu.add(new PrefsCheckBox(
+            "Enable Arrangement Editor Grid Lines", prefs,
+            "eb.TileEditor.arrEditor.gridLines", true, 'a', null,
+            "arrEdGridLines", this));
+        mb.add(optionsMenu);
+
+        JMenu focusMenu = new JMenu("Focus");
+        focusMenu.setMnemonic('c');
+
+        focusMenu.add(ToolModule.createJMenuItem("Background Graphics Editor",
+            'b', "ctrl B", "bgeFocus", this));
+        focusMenu.add(ToolModule.createJMenuItem("Foreground Graphics Editor",
+            'f', "ctrl F", "fgeFocus", this));
+        focusMenu.add(ToolModule.createJMenuItem(
+            "Arrangement Properties Editor", 'p', "ctrl P", "colFocus", this));
+        focusMenu.add(ToolModule.createJMenuItem("Arrangement Editor", 'a',
+            "ctrl A", "arrFocus", this));
+
+        focusMenu.add(new JSeparator());
+
+        focusMenu.add(ToolModule.createJMenuItem("Cycle Focus", 'y', "ctrl Y",
+            "cycFocus", this));
+
+        mb.add(focusMenu);
+
+        mainWindow.setJMenuBar(mb);
         
         JPanel scrolledArea = new JPanel(new BorderLayout());
         JPanel display = new JPanel(new BorderLayout());
