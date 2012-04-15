@@ -190,12 +190,14 @@ public class MainGUI implements ActionListener, WindowListener {
             	button.setActionCommand("module" + i);
                 button.addActionListener(this);
                 button.setMaximumSize(new Dimension(175, 26));
+                //button.setPreferredSize(new Dimension(175,26));
             	buttons.add(button);
             	moduleButtons.add(button);
             	button.setEnabled(false);
         	}
         	i++;
         }
+        //buttons.setPreferredSize(buttons.getMaximumSize());
         
         //mainWindow.getContentPane().add(scroll, BorderLayout.CENTER);
         mainWindow.getContentPane().add(buttons, BorderLayout.CENTER);
@@ -206,7 +208,7 @@ public class MainGUI implements ActionListener, WindowListener {
         
         mainWindow.invalidate();
         mainWindow.pack();
-        mainWindow.setSize(175, 200);
+        //mainWindow.setSize(175, 200);
         mainWindow.setLocationByPlatform(true);
         mainWindow.validate();
         mainWindow.setResizable(false);

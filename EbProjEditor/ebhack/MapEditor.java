@@ -13,6 +13,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -55,7 +57,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
-public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener {
+public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener, ComponentListener {
 	private JTextField xField, yField;
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
@@ -90,6 +92,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	public void init() {
         mainWindow = createBaseWindow(this);
         mainWindow.setTitle(this.getDescription());
+		mainWindow.addComponentListener(this);
         
         JMenuBar menuBar = new JMenuBar();
 		ButtonGroup group = new ButtonGroup();
@@ -252,20 +255,21 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		yScroll.addAdjustmentListener(this);
 		contentPanel.add(yScroll, BorderLayout.EAST);
 		
-		mainWindow.getContentPane().add(contentPanel, BorderLayout.NORTH);
+		mainWindow.getContentPane().add(contentPanel, BorderLayout.CENTER);
 		
 		tileSelector = new TileSelector(24, 3);
 		mapDisplay.setTileSelector(tileSelector);
 		mainWindow.getContentPane().add(
 				ToolModule.pairComponents(tileSelector, tileSelector.getScrollBar(), false),
-				BorderLayout.CENTER);
+				BorderLayout.PAGE_END);
         
         mainWindow.invalidate();
         mainWindow.pack();
         //mainWindow.setSize(300, 400);
         mainWindow.setLocationByPlatform(true);
         mainWindow.validate();
-        mainWindow.setResizable(false);
+        //mainWindow.setResizable(false);
+        mainWindow.setResizable(true);
 	}
 	
 	private void loadTilesetNames() {
@@ -1183,6 +1187,19 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			// TODO Auto-generated method stub
 			
 		}
+		
+		public void setScreenSize(int newSW, int newSH) {
+			if ((newSW != screenWidth) || (newSH != screenHeight)) {
+				screenWidth = newSW;
+				screenHeight = newSH;
+				
+				setPreferredSize(new Dimension(
+						screenWidth * MapData.TILE_WIDTH + 2,
+						screenHeight * MapData.TILE_HEIGHT + 2));
+				
+				repaint();
+			}
+		}
 	}
 	
     private class TileSelector extends AbstractButton implements MouseListener, AdjustmentListener {
@@ -1206,6 +1223,23 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			changeMode(0);
 			
 			this.addMouseListener(this);
+    	}
+    	
+    	public void setScreenSize(int newSW) {
+			if (newSW != width) {
+				width = newSW;
+				
+				setPreferredSize(new Dimension(
+						width * MapData.TILE_WIDTH + 3,
+						height * MapData.TILE_HEIGHT + 3));
+				scroll.setVisibleAmount(width);
+				if (scroll.getValue() + width + 1 > scroll.getMaximum()) {
+					scroll.setValue(scroll.getMaximum() - width - 1);
+					
+				}
+				
+				repaint();
+			}
     	}
     	
     	public void changeMode(int mode) {
@@ -2458,5 +2492,32 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			updateXYFields();
 			mapDisplay.repaint();
 		}
+	}
+
+
+	@Override
+	public void componentHidden(ComponentEvent arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void componentMoved(ComponentEvent arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void componentResized(ComponentEvent arg0) {
+		Dimension newD = mapDisplay.getSize();
+		int newSW = newD.width / 32 + 1, newSH = newD.height / 32 + 1;
+		mapDisplay.setScreenSize(newSW, newSH);
+		tileSelector.setScreenSize(newSW);
+	} 
+
+	@Override
+	public void componentShown(ComponentEvent arg0) {
+		// TODO Auto-generated method stub
+		
 	}
 }
