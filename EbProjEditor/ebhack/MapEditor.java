@@ -257,7 +257,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		mainWindow.getContentPane().add(contentPanel, BorderLayout.CENTER);
 		
-		tileSelector = new TileSelector(24, 3);
+		tileSelector = new TileSelector(24, 4);
 		mapDisplay.setTileSelector(tileSelector);
 		mainWindow.getContentPane().add(
 				ToolModule.pairComponents(tileSelector, tileSelector.getScrollBar(), false),
