@@ -196,6 +196,18 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		checkBox.setActionCommand("grid");
 		checkBox.addActionListener(this);
 		menu.add(checkBox);
+		checkBox = new JCheckBoxMenuItem("Show Tile Numbers");
+		checkBox.setMnemonic('t');
+		checkBox.setSelected(false);
+		checkBox.setActionCommand("tileNums");
+		checkBox.addActionListener(this);
+		menu.add(checkBox);
+		checkBox = new JCheckBoxMenuItem("Show NPC IDs");
+		checkBox.setMnemonic('n');
+		checkBox.setSelected(true);
+		checkBox.setActionCommand("npcNums");
+		checkBox.addActionListener(this);
+		menu.add(checkBox);
 		checkBox = new JCheckBoxMenuItem("Show Sprite Boxes");
 		checkBox.setMnemonic('b');
 		checkBox.setSelected(true);
@@ -365,8 +377,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		// Mode settings
 		private int previousMode = 0;
-		private boolean editMap = true;
-		private boolean drawSprites = false, editSprites = false;
+		private boolean editMap = true, drawTileNums = false;
+		private boolean drawSprites = false, editSprites = false, drawSpriteNums = true;
 		private boolean drawDoors = false, editDoors = false, seekDoor = false;
 		private boolean drawEnemies = false, editEnemies = false;
 		private boolean drawHotspots = false, editHotspots = false;
@@ -475,6 +487,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							j*MapData.TILE_WIDTH + 1, i*MapData.TILE_HEIGHT + 1,
 							MapData.TILE_WIDTH, MapData.TILE_HEIGHT,
 							this);
+					if (drawTileNums && !gamePreview) {
+						drawNumber(g, map.getMapTile(x+j, y+i), j * MapData.TILE_WIDTH + 1,
+								i * MapData.TILE_HEIGHT + 1, false, false);
+					}
 				}
 			}
 			
@@ -523,6 +539,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 										e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2 + 1,
 										e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 9,
 										this);
+								if (drawSpriteNums && !gamePreview) {
+									drawNumber(g, e.npcID,
+											e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
+											e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 8,
+											false, true);
+								}
 							}
 						} catch (Exception e) {
 							
@@ -609,7 +631,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							
 							g.setComposite(AlphaComposite.getInstance(
 									AlphaComposite.SRC_OVER, 1.0F));
-							g.setPaint(Color.black);
+							/*g.setPaint(Color.black);
 							message = addZeros(Integer.toString(a), 3);
 							rect = g.getFontMetrics().getStringBounds(message, g);
 							rect.setRect(
@@ -620,7 +642,9 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							g.setPaint(Color.white);
 							g.drawString(message,
 									(float) (j * MapData.TILE_WIDTH + 1),
-									(float) (i * MapData.TILE_HEIGHT + rect.getHeight()));
+									(float) (i * MapData.TILE_HEIGHT + rect.getHeight()));*/
+							drawNumber(g, a, j * MapData.TILE_WIDTH + 1,
+									i * MapData.TILE_HEIGHT + 1, false, false);
 						}
 					}
 				}
@@ -628,7 +652,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			
 			if (drawHotspots) {
 				MapData.Hotspot hs;
-				g.setPaint(Color.PINK);
 				g.setComposite(AlphaComposite.getInstance(
 						AlphaComposite.SRC_OVER, 0.8F));
 				int tx1, ty1, tx2, ty2;
@@ -642,15 +665,21 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							&& (ty1 >= 0) && (ty1 <= screenHeight))
 							|| ((tx2 >= 0) && (tx2 <= screenWidth)
 									&& (ty2 >= 0) && (ty2 <= screenHeight))) {
+						g.setPaint(Color.PINK);
 						g.fill(new Rectangle2D.Double(
 								hs.x1 * 8 - x * MapData.TILE_WIDTH + 1,
 								hs.y1 * 8 - y * MapData.TILE_HEIGHT + 1,
 								(hs.x2 - hs.x1) * 8,
 								(hs.y2 - hs.y1) * 8));
+						drawNumber(g, i,
+								hs.x1 * 8 - x * MapData.TILE_WIDTH + 1,
+								hs.y1 * 8 - y * MapData.TILE_HEIGHT + 1,
+								false, false);
 					}
 				}
 				
 				if (editHotspots && (editHS != null)) {
+					g.setPaint(Color.WHITE);
 					if (editHSx1 != -1) {
 						tx1 = editHSx1 * 8 - x * MapData.TILE_WIDTH + 1;
 						ty1 = editHSy1 * 8 - y * MapData.TILE_HEIGHT + 1;
@@ -662,6 +691,36 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 								hsMouseX+1, hsMouseY+1, 65, 65));
 					}
 				}
+			}
+		}
+		
+		private Rectangle2D textBG;
+		private void drawNumber(Graphics2D g, int n, int x, int y,
+				boolean hex, boolean above) {
+			String s;
+			if (hex)
+				s = addZeros(Integer.toHexString(n), 4);
+			else
+				s = addZeros(Integer.toString(n), 4);
+			
+			if (textBG == null)
+				textBG = g.getFontMetrics().getStringBounds(s, g);
+
+			g.setPaint(Color.black);
+			if (above) {
+				textBG.setRect(x, y-textBG.getHeight(), textBG.getWidth(), textBG.getHeight());
+				g.fill(textBG);
+				g.setPaint(Color.white);
+				g.drawString(s,
+						x,
+						y);
+			} else {
+				textBG.setRect(x, y, textBG.getWidth(), textBG.getHeight());
+				g.fill(textBG);
+				g.setPaint(Color.white);
+				g.drawString(s,
+						x,
+						y + ((int) textBG.getHeight()));
 			}
 		}
 		
@@ -1177,6 +1236,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void toggleSpriteBoxes() {
 			spriteBoxes = !spriteBoxes;
 		}
+		
+		public void toggleTileNums() {
+			drawTileNums = !drawTileNums;
+		}
+		
+		public void toggleSpriteNums() {
+			drawSpriteNums = !drawSpriteNums;
+		}
 
 		public void toggleMapChanges() {
 			// TODO Auto-generated method stub
@@ -1467,7 +1534,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			importEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
 			importHotspots(new File(proj.getFilename("eb.MiscTablesModule", "map_hotspots")));
 			
-			// Read the read-only data
+			loadExtraResources(proj);
+		}
+		
+		public void loadExtraResources(Project proj) {
 			importNPCs(new File(proj.getFilename("eb.MiscTablesModule", "npc_config_table")));
 			importSpriteGroups(proj);
 		}
@@ -2172,6 +2242,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		map.save(proj);
 	}
 	
+	public void refresh(Project proj) {
+		map.loadExtraResources(proj);
+		
+		if (isInited)
+			mapDisplay.repaint();
+	}
+	
 	public void reset() {
 		map.reset();
 	}
@@ -2354,6 +2431,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("spriteboxes")) {
 			mapDisplay.toggleSpriteBoxes();
+			mapDisplay.repaint();
+		} else if (e.getActionCommand().equals("tileNums")) {
+			mapDisplay.toggleTileNums();
+			mapDisplay.repaint();
+		} else if (e.getActionCommand().equals("npcNums")) {
+			mapDisplay.toggleSpriteNums();
 			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("mapchanges")) {
 			mapDisplay.toggleMapChanges();

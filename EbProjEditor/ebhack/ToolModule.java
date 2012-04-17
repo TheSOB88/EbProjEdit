@@ -67,6 +67,8 @@ public abstract class ToolModule {
 	
 	public void reset() { };
 	
+	public void refresh(Project proj) { };
+	
     public void show()
     {
         if (!isInited)

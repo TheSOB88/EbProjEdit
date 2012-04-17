@@ -41,8 +41,8 @@ public class MainGUI implements ActionListener, WindowListener {
 	private YMLPreferences prefs;
 	private Project project;
 	
-	JMenuItem close, save, projProp;
-	JButton saveB, saveAsB;
+	JMenuItem close, save, refresh, projProp;
+	JButton saveB, refreshB, saveAsB;
 	JLabel statusBar;
 	
 	private boolean busy = false;
@@ -131,6 +131,8 @@ public class MainGUI implements ActionListener, WindowListener {
             "close", this));
         fileMenu.add(save = ToolModule.createJMenuItem("Save Project", 's',
             "ctrl S", "save", this));
+        fileMenu.add(refresh = ToolModule.createJMenuItem("Refresh Project", 'r',
+                "ctrl R", "refresh", this));
         //fileMenu.add(saveAs = ToolModule.createJMenuItem("Save Project As...", 'a',
         //    "ctrl A", "saveAs", this));
         fileMenu.add(new JSeparator());
@@ -168,6 +170,7 @@ public class MainGUI implements ActionListener, WindowListener {
         toolbar.setRollover(true);
         toolbar.add(genTopButton("Open24.gif", "Open Project", "open"));
         toolbar.add(saveB = genTopButton("Save24.gif", "Save Project", "save"));
+        toolbar.add(refreshB = genTopButton("Refresh24.gif", "Refresh Project", "refresh"));
         saveAsB = genTopButton("SaveAs24.gif", "Save Project As...", "saveAs");
         //toolbar.add(saveAsB);
         panel = new JPanel();
@@ -215,8 +218,10 @@ public class MainGUI implements ActionListener, WindowListener {
         
         close.setEnabled(false);
         save.setEnabled(false);
+        refresh.setEnabled(false);
         projProp.setEnabled(false);
         saveB.setEnabled(false);
+        refreshB.setEnabled(false);
         saveAsB.setEnabled(false);
         
         mainWindow.setVisible(true);
@@ -238,8 +243,10 @@ public class MainGUI implements ActionListener, WindowListener {
 		if (project.isLoaded()) {
 			close.setEnabled(true);
 	        save.setEnabled(true);
+	        refresh.setEnabled(true);
 	        projProp.setEnabled(true);
 	        saveB.setEnabled(true);
+	        refreshB.setEnabled(true);
 	        saveAsB.setEnabled(true);
 	        
 	        ListIterator<JButton> listIterator = moduleButtons.listIterator();
@@ -248,8 +255,10 @@ public class MainGUI implements ActionListener, WindowListener {
 		} else {
 			close.setEnabled(false);
 	        save.setEnabled(false);
+	        refresh.setEnabled(false);
 	        projProp.setEnabled(false);
 	        saveB.setEnabled(false);
+	        refreshB.setEnabled(false);
 	        saveAsB.setEnabled(false);
 	        
 	        ListIterator<JButton> listIterator = moduleButtons.listIterator();
@@ -333,6 +342,15 @@ public class MainGUI implements ActionListener, WindowListener {
         	setStatusBar("Loading " + x.getDescription() + "...");
         	x.load(project);
         	//listIterator.next().load(project);
+        }
+	}
+	
+	private void refreshModulesData() {
+        ListIterator<ToolModule> listIterator = moduleList.listIterator();
+        while(listIterator.hasNext()) {
+        	ToolModule x = listIterator.next();
+        	setStatusBar("Refreshing " + x.getDescription() + "...");
+        	x.refresh(project);
         }
 	}
 	
@@ -452,6 +470,19 @@ public class MainGUI implements ActionListener, WindowListener {
     	setStatusBar("Loading Project...");
     	if ((projFile == null ? project.load() : project.load(projFile))) {
     		loadModulesData();
+    		updateGUI();
+    		resetStatusBar();
+    		return true;
+    	} else {
+    		resetStatusBar();
+    		return false;
+    	}
+    }
+    
+    private boolean refreshProject() {
+    	setStatusBar("Loading Project...");
+    	if (project.isLoaded()) {
+    		refreshModulesData();
     		updateGUI();
     		resetStatusBar();
     		return true;
@@ -600,6 +631,21 @@ public class MainGUI implements ActionListener, WindowListener {
 						return null;
 					
 					loadProject();
+					return null;
+				}
+				
+				public void done() {
+					exitBusy();
+				}
+			};
+			worker.execute();
+		} else if (e.getActionCommand().equals("refresh")) {
+			SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
+				public Void doInBackground() {
+					if (!enterBusy())
+						return null;
+					
+					refreshProject();
 					return null;
 				}
 				
