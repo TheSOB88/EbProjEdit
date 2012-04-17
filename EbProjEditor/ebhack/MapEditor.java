@@ -1677,7 +1677,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			public int destX, destY, destDir, style;
 			
 			public Door() {
-				this.type = "Ladder";
+				this.type = "ladder";
+				this.pointer = "$0";
 			}
 			public Door(int x, int y, String type) {
 				this.x = x; this.y = y; this.type = type;

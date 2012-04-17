@@ -2687,7 +2687,7 @@ public class TileEditor extends ToolModule implements ActionListener{
         {
             return this.getTilesetAsString() + "\n\n\n"
                 + this.getPalettesAsString() + "\n\n\n"
-                + this.getArrangementsAsString();
+                + this.getArrangementsAsString() + "\n";
         }
 
         /**
