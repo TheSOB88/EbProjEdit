@@ -521,7 +521,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			if (drawSprites) {
 				MapData.NPC npc;
 				int[] wh;
-				g.setPaint(Color.RED);
 				List<MapData.SpriteEntry> area;
 				for (i = y&(~7); i < (y&(~7)) + screenHeight + 8; i += 8) {
 					for (j = x&(~7); j < (x&(~7)) + screenWidth + 8; j += 8) {
@@ -530,11 +529,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							for (MapData.SpriteEntry e : area) {
 								npc = map.getNPC(e.npcID);
 								wh = map.getSpriteWH(npc.sprite);
-								if (spriteBoxes && !gamePreview)
+								if (spriteBoxes && !gamePreview) {
+									g.setPaint(Color.RED);
 									g.draw(new Rectangle2D.Double(
 											e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
 											e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 8,
 											wh[0]+1, wh[1]+1));
+								}
 								g.drawImage(map.getSpriteImage(npc.sprite, npc.direction),
 										e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2 + 1,
 										e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 9,
@@ -553,10 +554,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				}
 				
 				if (editSprites && (movingNPC != -1)) {
-					if (spriteBoxes)
+					if (spriteBoxes) {
+						g.setPaint(Color.RED);
 						g.draw(new Rectangle2D.Double(
 								movingDrawX-1, movingDrawY-1,
 								movingNPCdim[0]+1, movingNPCdim[1]+1));
+					}
 					g.drawImage(movingNPCimg, movingDrawX, movingDrawY, this);
 				}
 			}
@@ -969,7 +972,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			} else if (ae.getActionCommand().equals("copyDoor")) {
 				copiedDoor = popupDoor.copy();
 			} else if (ae.getActionCommand().equals("pasteDoor")) {
-				pushDoorFromMouseXY(copiedDoor, popupX, popupY);
+				pushDoorFromMouseXY(copiedDoor.copy(), popupX, popupY);
 				repaint();
 			} else if (ae.getActionCommand().equals("editDoor")) {
 				ebhack.Ebhack.main.showModule(DoorEditor.class,
@@ -1607,8 +1610,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		public Door getDoorFromCoords(int areaX, int areaY, int x, int y) {
 			for (Door e : doorAreas[areaY][areaX]) {
-				if ((x <= e.x + 8) && (x >= e.x)
-						&& (y <= e.y + 8) && (y >= e.y)) {
+				if ((x <= e.x + 1) && (x >= e.x)
+						&& (y <= e.y + 1) && (y >= e.y)) {
 					return e;
 				}
 			}

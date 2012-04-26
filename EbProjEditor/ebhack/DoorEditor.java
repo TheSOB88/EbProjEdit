@@ -43,7 +43,7 @@ public class DoorEditor extends ToolModule implements ActionListener {
 	}
 	
 	private final String[] climbDirections = {
-			"NW", "NE", "SW", "SE", "Nowhere"
+			"nw", "ne", "sw", "se", "nowhere"
 	};
 	private final String[] typeNames = {
 			"switch", "rope", "ladder", "door", "escalator",
