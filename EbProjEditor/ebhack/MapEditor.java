@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 import javax.imageio.ImageIO;
 import javax.swing.AbstractButton;
@@ -50,6 +51,7 @@ import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollBar;
 import javax.swing.JSeparator;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
@@ -57,12 +59,14 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
+import ebhack.MapEditor.MapData.Sector;
+
 public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener, ComponentListener {
 	private JTextField xField, yField;
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
 	private JMenu modeMenu;
-	private JMenuItem sectorProps, /*findSprite,*/ copySector, pasteSector, undo;
+	private JMenuItem /*sectorProps,*/ /*findSprite,*/ copySector, pasteSector, undo, redo;
 	
 	public static MapData map;
 	private MapDisplay mapDisplay;
@@ -100,80 +104,33 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		JRadioButtonMenuItem radioButton;
 		JMenu menu;
 
-		menu = new JMenu("File");
-		menu.add(ToolModule.createJMenuItem("Apply Changes", 's', null,
+		/*menu = new JMenu("File");
+		menu.add(ToolModule.createJMenuItem("Apply Changes", 's', "control S",
 				"apply", this));
-		menu.add(ToolModule.createJMenuItem("Exit", 'x', null,
+		menu.add(ToolModule.createJMenuItem("Exit", 'x', "alt F4",
 				"close", this));
-		menuBar.add(menu);
+		menuBar.add(menu);*/
 
 		menu = new JMenu("Edit");
-		undo = ToolModule.createJMenuItem("Undo Tile Change", 'u', null,
+		undo = ToolModule.createJMenuItem("Undo Tile Change", 'u', "control Z",
 				"undoMap", this);
 		undo.setEnabled(false);
-		//menu.add(undo);
-		copySector = ToolModule.createJMenuItem("Copy Sector", 'c', null,
+		menu.add(undo);
+		redo = ToolModule.createJMenuItem("Redo Tile Change", 'r', "control Y",
+				"redoMap", this);
+		redo.setEnabled(false);
+		menu.add(redo);
+		menu.add(new JSeparator());
+		copySector = ToolModule.createJMenuItem("Copy Sector", 'c', "control C",
 				"copySector", this);
 		menu.add(copySector);
-		pasteSector = ToolModule.createJMenuItem("Paste Sector", 'p', null,
+		pasteSector = ToolModule.createJMenuItem("Paste Sector", 'p', "control V",
 				"pasteSector", this);
 		menu.add(pasteSector);
-		sectorProps = ToolModule.createJMenuItem("Edit Sector's Properties",
-				'r', null, "sectorEdit", this);
+		//sectorProps = ToolModule.createJMenuItem("Edit Sector's Properties",
+		//		'r', null, "sectorEdit", this);
 		//menu.add(sectorProps);
-		menuBar.add(menu);
-
-		modeMenu = new JMenu("Mode");
-		group = new ButtonGroup();
-		radioButton = new JRadioButtonMenuItem("Map Edit");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode0");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-		radioButton = new JRadioButtonMenuItem("Sprite Edit");
-		radioButton.setSelected(false);
-		radioButton.setActionCommand("mode1");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-		radioButton = new JRadioButtonMenuItem("Door Edit");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode2");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-		radioButton = new JRadioButtonMenuItem("Enemy Edit");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode7");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-		radioButton = new JRadioButtonMenuItem("Hotspot Edit");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode6");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-		radioButton = new JRadioButtonMenuItem("Whole View");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode8");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-		menuBar.add(modeMenu);
-		radioButton = new JRadioButtonMenuItem("Game View");
-		radioButton.setSelected(true);
-		radioButton.setActionCommand("mode9");
-		radioButton.addActionListener(this);
-		group.add(radioButton);
-		modeMenu.add(radioButton);
-
-		menu = new JMenu("Actions");
-		//findSprite = ToolModule.createJMenuItem("Find Sprite Entry", 'f',
-		//		null, "findSprite", this);
-		//menu.add(findSprite);
-		//menu.add(new JSeparator());
+		menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Clear Map", 'm', null,
 				"delAllMap", this));
 		menu.add(ToolModule.createJMenuItem("Delete All Sprites", 's', null,
@@ -188,6 +145,59 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		menu.add(ToolModule.createJMenuItem("Clear Tile Image Cache", 't',
 				null, "resetTileImages", this));
 		menuBar.add(menu);
+
+		modeMenu = new JMenu("Mode");
+		group = new ButtonGroup();
+		radioButton = new JRadioButtonMenuItem("Map Edit");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F1"));
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode0");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Sprite Edit");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F2"));
+		radioButton.setSelected(false);
+		radioButton.setActionCommand("mode1");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Door Edit");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F3"));
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode2");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Enemy Edit");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F4"));
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode7");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Hotspot Edit");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F5"));
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode6");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		radioButton = new JRadioButtonMenuItem("Whole View");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F6"));
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode8");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
+		menuBar.add(modeMenu);
+		radioButton = new JRadioButtonMenuItem("Game View");
+		radioButton.setAccelerator(KeyStroke.getKeyStroke("F7"));
+		radioButton.setSelected(true);
+		radioButton.setActionCommand("mode9");
+		radioButton.addActionListener(this);
+		group.add(radioButton);
+		modeMenu.add(radioButton);
 
 		menu = new JMenu("Options");
 		checkBox = new JCheckBoxMenuItem("Show Grid");
@@ -254,7 +264,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		tilesetChooser.setEnabled(false);
 		musicChooser.setEnabled(false);
 		
-		mapDisplay = new MapDisplay(map, copySector, pasteSector);
+		mapDisplay = new MapDisplay(map, copySector, pasteSector, undo, redo);
 		mapDisplay.addMouseWheelListener(this);
 		mapDisplay.addActionListener(this);
 		mapDisplay.init();
@@ -332,11 +342,37 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	
 	public static class MapDisplay extends AbstractButton implements ActionListener, MouseListener, MouseMotionListener {
 		private MapData map;
-		private JMenuItem copySector, pasteSector;
+		private JMenuItem copySector, pasteSector, undoButton, redoButton;
 		
 		private final ActionEvent sectorEvent = new ActionEvent(this, ActionEvent.ACTION_PERFORMED, "sectorChanged");
 		
 		private static Image[][][] tileImageCache;
+		
+		private class UndoableTileChange {
+			public int x, y, oldTile, newTile;
+			public UndoableTileChange(int x, int y, int oldTile, int newTile) {
+				this.x = x;
+				this.y = y;
+				this.oldTile = oldTile;
+				this.newTile = newTile;
+			}
+		}
+		
+		private class UndoableSectorPaste {
+			public int sectorX, sectorY;
+			private int[][] tiles;
+			private Sector sector;
+			public UndoableSectorPaste(int sectorX, int sectorY, int[][] tiles, Sector sector) {
+				this.sectorX = sectorX;
+				this.sectorY = sectorY;
+				this.tiles = tiles;
+				this.sector = sector;
+			}
+			
+		}
+		
+		private Stack<Object> undoStack = new Stack<Object>();
+		private Stack<Object> redoStack = new Stack<Object>();
 		
 		private int screenWidth = 24;
 		private int screenHeight = 12;
@@ -389,7 +425,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		
 		private TileSelector tileSelector;
 		
-		public MapDisplay(MapData map, JMenuItem copySector, JMenuItem pasteSector) {
+		public MapDisplay(MapData map, JMenuItem copySector, JMenuItem pasteSector, JMenuItem undoButton, JMenuItem redoButton) {
 			super();
 			
 			if (enemyColors == null) {
@@ -401,6 +437,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			this.map = map;
 			this.copySector = copySector;
 			this.pasteSector = pasteSector;
+			this.undoButton = undoButton;
+			this.redoButton = redoButton;
 			
 			if (tileImageCache == null)
 				resetTileImageCache();
@@ -446,6 +484,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void init() {
 			selectSector(0,0);
 			changeMode(0);
+			reset();
+		}
+		
+		public void reset() {
+			undoStack.clear();
+			undoButton.setEnabled(false);
+			redoStack.clear();
+			redoButton.setEnabled(false);
 		}
 		
 		public void setTileSelector(TileSelector tileSelector) {
@@ -565,7 +611,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 			
 			if (drawDoors) {
-				MapData.Door d;
 				List<MapData.Door> area;
 				for (i = y&(~7); i < (y&(~7)) + screenHeight + 8; i += 8) {
 					for (j = x&(~7); j < (x&(~7)) + screenWidth + 8; j += 8) {
@@ -618,8 +663,6 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			
 			if (drawEnemies) {
 				g.setFont(new Font("Arial", Font.PLAIN, 12));
-				String message;
-				Rectangle2D rect;
 				for (i = -(y%2); i < screenHeight; i += 2) {
 					for (j = -(x%2); j < screenWidth; j += 2) {
 						a = map.getMapEnemyGroup((x+j)/2, (y+i)/2);
@@ -841,6 +884,11 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 						if (e.isShiftDown()) {
 							tileSelector.selectTile(map.getMapTile(mX, mY));
 						} else {
+							// Keep track of the undo stuff
+							undoStack.push(new UndoableTileChange(mX, mY, map.getMapTile(mX, mY), tileSelector.getSelectedTile()));
+							undoButton.setEnabled(true);
+							redoStack.clear();
+							
 							map.setMapTile(mX, mY, tileSelector.getSelectedTile());
 							repaint();
 						}
@@ -1253,9 +1301,43 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			
 		}
 
-		public void undoMapAction() {
-			// TODO Auto-generated method stub
-			
+		public boolean undoMapAction() {
+			if (!undoStack.empty()) {
+				Object undo = undoStack.pop();
+				if (undo instanceof UndoableTileChange) {
+					UndoableTileChange tc = (UndoableTileChange) undo;
+					map.setMapTile(tc.x, tc.y, tc.oldTile);
+				} else if (undo instanceof UndoableSectorPaste) {
+					//UndoableSectorPaste usp = (UndoableSectorPaste) undo;
+					// TODO
+				}
+				if (undoStack.isEmpty())
+					undoButton.setEnabled(false);
+				redoStack.push(undo);
+				redoButton.setEnabled(true);
+				repaint();
+				return true;
+			} else
+				return false;
+		}
+		
+		public boolean redoMapAction() {
+			if (!redoStack.empty()) {
+				Object redo = redoStack.pop();
+				if (redo instanceof UndoableTileChange) {
+					UndoableTileChange tc = (UndoableTileChange) redo;
+					map.setMapTile(tc.x, tc.y, tc.newTile);
+				} else if (redo instanceof UndoableSectorPaste) {
+					// TODO
+				}
+				if (redoStack.isEmpty())
+					redoButton.setEnabled(false);
+				undoStack.push(redo);
+				undoButton.setEnabled(true);
+				repaint();
+				return true;
+			} else
+				return false;
 		}
 		
 		public void setScreenSize(int newSW, int newSH) {
@@ -1269,6 +1351,19 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				
 				repaint();
 			}
+		}
+
+		public void pasteSector(Sector copiedSector, int sectorX2,
+				int sectorY2, int[][] copiedSectorTiles) {
+			for (int i = 0; i < copiedSectorTiles.length; i++)
+				for (int j = 0; j < copiedSectorTiles[i].length; j++) {
+					map.setMapTile(sectorX * 8 + j,
+							sectorY * 4 + i,
+							copiedSectorTiles[i][j]);
+				}
+			map.getSector(sectorX, sectorY).copy(copiedSector);
+			// TODO
+			//undoStack.push(new UndoableSectorPaste(sectorX, sectorY, copiedSectorTiles, copiedSector));
 		}
 	}
 	
@@ -2254,6 +2349,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	
 	public void reset() {
 		map.reset();
+		mapDisplay.reset();
 	}
 	
 	private void updateXYScrollBars() {
@@ -2383,8 +2479,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("delAllSprites")) {
 			int sure = JOptionPane.showConfirmDialog(mainWindow,
-					"Are you sure you want to "
-							+ "delete all of the sprites?",
+					"Are you sure you want to delete all of the sprites?\n"
+					+ "Note that the game may crash if less than 8 sprites exist on the map.",
 					"Are you sure?", JOptionPane.YES_NO_OPTION);
 			if (sure == JOptionPane.YES_OPTION) {
 				map.nullSpriteData();
@@ -2426,7 +2522,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				mapDisplay.repaint();
 			}
 		} else if (e.getActionCommand().equals("resetTileImages")) {
-			mapDisplay.resetTileImageCache();
+			MapDisplay.resetTileImageCache();
 			mapDisplay.repaint();
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("grid")) {
@@ -2506,13 +2602,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		} else if (e.getActionCommand().equals("pasteSector")) {
 			int sectorX = mapDisplay.getSectorX();
 			int sectorY = mapDisplay.getSectorY();
-			for (int i = 0; i < copiedSectorTiles.length; i++)
-				for (int j = 0; j < copiedSectorTiles[i].length; j++) {
-					map.setMapTile(sectorX * 8 + j,
-							sectorY * 4 + i,
-							copiedSectorTiles[i][j]);
-				}
-			map.getSector(sectorX, sectorY).copy(copiedSector);
+			mapDisplay.pasteSector(copiedSector, sectorX, sectorY, copiedSectorTiles);
 			mapDisplay.repaint();
 			//gfxcontrol.updateComponents();
 		/*} else if (ac.equals(ENEMY_SPRITES)) {
@@ -2522,7 +2612,17 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		} else if (ac.equals(EVENTPAL)) {
 			gfxcontrol.toggleEventPalette();*/
 		} else if (e.getActionCommand().equals("undoMap")) {
-			mapDisplay.undoMapAction();
+			if (!mapDisplay.undoMapAction()) {
+				JOptionPane.showMessageDialog(mainWindow,
+						"There are no actions to undo.",
+						"Error", JOptionPane.ERROR_MESSAGE);
+			}
+		} else if (e.getActionCommand().equals("redoMap")) {
+			if (!mapDisplay.redoMapAction()) {
+				JOptionPane.showMessageDialog(mainWindow,
+						"There are no actions to redo.",
+						"Error", JOptionPane.ERROR_MESSAGE);
+			}
 		}
 	}
 
