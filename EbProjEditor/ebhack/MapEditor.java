@@ -1558,7 +1558,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					ebhack.Ebhack.main.showModule(
 							TileEditor.class, new int[] { 
 								TileEditor.getDrawTilesetNumber(tilesetChooser.getSelectedIndex()),
-								0,
+								mapDisplay.getSelectedSectorPalNumber(),
 								tile });
 				}
 			}
@@ -2349,7 +2349,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	
 	public void reset() {
 		map.reset();
-		mapDisplay.reset();
+		if (mapDisplay != null)
+			mapDisplay.reset();
 	}
 	
 	private void updateXYScrollBars() {

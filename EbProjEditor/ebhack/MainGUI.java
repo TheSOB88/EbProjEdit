@@ -52,7 +52,7 @@ public class MainGUI implements ActionListener, WindowListener {
 	}
 	
 	public static String getVersion() {
-		return "0.1";
+		return "v. \"secret8\"";
 	}
 	
     public static String getCredits() {
