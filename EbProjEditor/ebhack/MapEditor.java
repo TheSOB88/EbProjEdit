@@ -3,12 +3,15 @@ package ebhack;
 import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
@@ -61,23 +64,26 @@ import org.yaml.snakeyaml.Yaml;
 
 import ebhack.MapEditor.MapData.Sector;
 
-public class MapEditor extends ToolModule implements ActionListener, DocumentListener, AdjustmentListener, MouseWheelListener, ComponentListener {
+public class MapEditor extends ToolModule implements ActionListener,
+		DocumentListener, AdjustmentListener, MouseWheelListener,
+		ComponentListener {
 	private JTextField xField, yField;
 	private JComboBox tilesetChooser, palChooser, musicChooser;
 	private JScrollBar xScroll, yScroll;
 	private JMenu modeMenu;
-	private JMenuItem /*sectorProps,*/ /*findSprite,*/ copySector, pasteSector, undo, redo;
-	
+	private JMenuItem /* sectorProps, *//* findSprite, */copySector, pasteSector,
+			undo, redo;
+
 	public static MapData map;
 	private MapDisplay mapDisplay;
 	private TileSelector tileSelector;
-	
+
 	private MapData.Sector copiedSector;
 	private int[][] copiedSectorTiles = new int[4][8];
-	
+
 	public MapEditor(YMLPreferences prefs) {
 		super(prefs);
-		
+
 		map = new MapData();
 	}
 
@@ -94,22 +100,23 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	}
 
 	public void init() {
-        mainWindow = createBaseWindow(this);
-        mainWindow.setTitle(this.getDescription());
+		mainWindow = createBaseWindow(this);
+		mainWindow.setTitle(this.getDescription());
 		mainWindow.addComponentListener(this);
-        
-        JMenuBar menuBar = new JMenuBar();
+
+		JMenuBar menuBar = new JMenuBar();
 		ButtonGroup group = new ButtonGroup();
 		JCheckBoxMenuItem checkBox;
 		JRadioButtonMenuItem radioButton;
 		JMenu menu;
 
-		/*menu = new JMenu("File");
-		menu.add(ToolModule.createJMenuItem("Apply Changes", 's', "control S",
-				"apply", this));
-		menu.add(ToolModule.createJMenuItem("Exit", 'x', "alt F4",
-				"close", this));
-		menuBar.add(menu);*/
+		/*
+		 * menu = new JMenu("File");
+		 * menu.add(ToolModule.createJMenuItem("Apply Changes", 's',
+		 * "control S", "apply", this));
+		 * menu.add(ToolModule.createJMenuItem("Exit", 'x', "alt F4", "close",
+		 * this)); menuBar.add(menu);
+		 */
 
 		menu = new JMenu("Edit");
 		undo = ToolModule.createJMenuItem("Undo Tile Change", 'u', "control Z",
@@ -121,15 +128,15 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		redo.setEnabled(false);
 		menu.add(redo);
 		menu.add(new JSeparator());
-		copySector = ToolModule.createJMenuItem("Copy Sector", 'c', "control C",
-				"copySector", this);
+		copySector = ToolModule.createJMenuItem("Copy Sector", 'c',
+				"control C", "copySector", this);
 		menu.add(copySector);
-		pasteSector = ToolModule.createJMenuItem("Paste Sector", 'p', "control V",
-				"pasteSector", this);
+		pasteSector = ToolModule.createJMenuItem("Paste Sector", 'p',
+				"control V", "pasteSector", this);
 		menu.add(pasteSector);
-		//sectorProps = ToolModule.createJMenuItem("Edit Sector's Properties",
-		//		'r', null, "sectorEdit", this);
-		//menu.add(sectorProps);
+		// sectorProps = ToolModule.createJMenuItem("Edit Sector's Properties",
+		// 'r', null, "sectorEdit", this);
+		// menu.add(sectorProps);
 		menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Clear Map", 'm', null,
 				"delAllMap", this));
@@ -137,13 +144,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				"delAllSprites", this));
 		menu.add(ToolModule.createJMenuItem("Delete All Doors", 'o', null,
 				"delAllDoors", this));
-		menu.add(ToolModule.createJMenuItem("Clear Enemy Placements", 'e', null,
-				"delAllEnemies", this));
-		menu.add(ToolModule.createJMenuItem("Delete/Clear All Of The Above", 'a', null,
-				"delAllEverything", this));
+		menu.add(ToolModule.createJMenuItem("Clear Enemy Placements", 'e',
+				null, "delAllEnemies", this));
+		menu.add(ToolModule.createJMenuItem("Delete/Clear All Of The Above",
+				'a', null, "delAllEverything", this));
 		menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Clear Tile Image Cache", 't',
-				null, "resetTileImages", this));
+				"control R", "resetTileImages", this));
 		menuBar.add(menu);
 
 		modeMenu = new JMenu("Mode");
@@ -229,20 +236,24 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		checkBox.setSelected(false);
 		checkBox.setActionCommand("mapchanges");
 		checkBox.addActionListener(this);
-		//menu.add(checkBox);
+		// menu.add(checkBox);
+		menu.add(new PrefsCheckBox("Mask Overscan in Preview", prefs,
+				"maskOverscan", false, 'o'));
 		menuBar.add(menu);
-		
+
 		mainWindow.setJMenuBar(menuBar);
 
 		JPanel contentPanel = new JPanel(new BorderLayout());
-        
+
 		JPanel panel = new JPanel(new FlowLayout());
 		panel.add(new JLabel("X: "));
-		xField = ToolModule.createSizedJTextField(Integer.toString(MapData.WIDTH_IN_TILES).length(), true);
+		xField = ToolModule.createSizedJTextField(
+				Integer.toString(MapData.WIDTH_IN_TILES).length(), true);
 		xField.getDocument().addDocumentListener(this);
 		panel.add(xField);
 		panel.add(new JLabel("Y: "));
-		yField = ToolModule.createSizedJTextField(Integer.toString(MapData.HEIGHT_IN_TILES).length(), true);
+		yField = ToolModule.createSizedJTextField(
+				Integer.toString(MapData.HEIGHT_IN_TILES).length(), true);
 		panel.add(yField);
 		panel.add(new JLabel("Tileset: "));
 		tilesetChooser = new JComboBox();
@@ -260,50 +271,55 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		panel.add(musicChooser);
 		loadMusicNames();
 		contentPanel.add(panel, BorderLayout.NORTH);
-		
+
 		tilesetChooser.setEnabled(false);
 		musicChooser.setEnabled(false);
-		
-		mapDisplay = new MapDisplay(map, copySector, pasteSector, undo, redo);
+
+		mapDisplay = new MapDisplay(map, copySector, pasteSector, undo, redo,
+				prefs);
 		mapDisplay.addMouseWheelListener(this);
 		mapDisplay.addActionListener(this);
 		mapDisplay.init();
 		contentPanel.add(mapDisplay, BorderLayout.CENTER);
-		
-		xScroll = new JScrollBar(JScrollBar.HORIZONTAL, 0, mapDisplay.getScreenWidth(), 0, MapData.WIDTH_IN_TILES);
+
+		xScroll = new JScrollBar(JScrollBar.HORIZONTAL, 0,
+				mapDisplay.getScreenWidth(), 0, MapData.WIDTH_IN_TILES);
 		xScroll.addAdjustmentListener(this);
 		contentPanel.add(xScroll, BorderLayout.SOUTH);
-		yScroll = new JScrollBar(JScrollBar.VERTICAL, 0, mapDisplay.getScreenHeight(), 0, MapData.HEIGHT_IN_TILES);
+		yScroll = new JScrollBar(JScrollBar.VERTICAL, 0,
+				mapDisplay.getScreenHeight(), 0, MapData.HEIGHT_IN_TILES);
 		yScroll.addAdjustmentListener(this);
 		contentPanel.add(yScroll, BorderLayout.EAST);
-		
+
 		mainWindow.getContentPane().add(contentPanel, BorderLayout.CENTER);
-		
+
 		tileSelector = new TileSelector(24, 4);
 		mapDisplay.setTileSelector(tileSelector);
 		mainWindow.getContentPane().add(
-				ToolModule.pairComponents(tileSelector, tileSelector.getScrollBar(), false),
+				ToolModule.pairComponents(tileSelector,
+						tileSelector.getScrollBar(), false),
 				BorderLayout.PAGE_END);
-        
-        mainWindow.invalidate();
-        mainWindow.pack();
-        //mainWindow.setSize(300, 400);
-        mainWindow.setLocationByPlatform(true);
-        mainWindow.validate();
-        //mainWindow.setResizable(false);
-        mainWindow.setResizable(true);
+
+		mainWindow.invalidate();
+		mainWindow.pack();
+		// mainWindow.setSize(300, 400);
+		mainWindow.setLocationByPlatform(true);
+		mainWindow.validate();
+		// mainWindow.setResizable(false);
+		mainWindow.setResizable(true);
 	}
-	
+
 	private void loadTilesetNames() {
 		tilesetChooser.removeActionListener(this);
 		tilesetChooser.removeAllItems();
 		for (int i = 0; i < MapData.NUM_MAP_TSETS; i++)
-			tilesetChooser.addItem(getNumberedString(
-					TileEditor.TILESET_NAMES[TileEditor.getDrawTilesetNumber(i)], i,
-					false));
+			tilesetChooser
+					.addItem(getNumberedString(
+							TileEditor.TILESET_NAMES[TileEditor
+									.getDrawTilesetNumber(i)], i, false));
 		tilesetChooser.addActionListener(this);
 	}
-	
+
 	// TODO make it actually load names from musiclisting.txt
 	public void loadMusicNames() {
 		musicChooser.removeActionListener(this);
@@ -312,13 +328,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			musicChooser.addItem(getNumberedString("", i, false));
 		musicChooser.addActionListener(this);
 	}
-	
+
 	public void show() {
 		super.show();
-		
+
 		mainWindow.setVisible(true);
 	}
-	
+
 	public void show(Object o) {
 		super.show();
 		if (o instanceof DoorEditor) {
@@ -326,30 +342,34 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			mapDisplay.repaint();
 		} else if (o instanceof int[]) {
 			int[] coords = (int[]) o;
-			mapDisplay.setMapXY(coords[0]/MapData.TILE_WIDTH,
-					coords[1]/MapData.TILE_HEIGHT);
+			mapDisplay.setMapXY(coords[0] / MapData.TILE_WIDTH, coords[1]
+					/ MapData.TILE_HEIGHT);
 			updateXYFields();
 			updateXYScrollBars();
 			mapDisplay.repaint();
 		}
 		mainWindow.setVisible(true);
 	}
-	
+
 	public void hide() {
 		if (isInited)
 			mainWindow.setVisible(false);
 	}
-	
-	public static class MapDisplay extends AbstractButton implements ActionListener, MouseListener, MouseMotionListener {
+
+	public static class MapDisplay extends AbstractButton implements
+			ActionListener, MouseListener, MouseMotionListener {
+		private YMLPreferences prefs;
 		private MapData map;
 		private JMenuItem copySector, pasteSector, undoButton, redoButton;
-		
-		private final ActionEvent sectorEvent = new ActionEvent(this, ActionEvent.ACTION_PERFORMED, "sectorChanged");
-		
+
+		private final ActionEvent sectorEvent = new ActionEvent(this,
+				ActionEvent.ACTION_PERFORMED, "sectorChanged");
+
 		private static Image[][][] tileImageCache;
-		
+
 		private class UndoableTileChange {
 			public int x, y, oldTile, newTile;
+
 			public UndoableTileChange(int x, int y, int oldTile, int newTile) {
 				this.x = x;
 				this.y = y;
@@ -357,26 +377,28 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				this.newTile = newTile;
 			}
 		}
-		
+
 		private class UndoableSectorPaste {
 			public int sectorX, sectorY;
 			private int[][] tiles;
 			private Sector sector;
-			public UndoableSectorPaste(int sectorX, int sectorY, int[][] tiles, Sector sector) {
+
+			public UndoableSectorPaste(int sectorX, int sectorY, int[][] tiles,
+					Sector sector) {
 				this.sectorX = sectorX;
 				this.sectorY = sectorY;
 				this.tiles = tiles;
 				this.sector = sector;
 			}
-			
+
 		}
-		
+
 		private Stack<Object> undoStack = new Stack<Object>();
 		private Stack<Object> redoStack = new Stack<Object>();
-		
+
 		private int screenWidth = 24;
 		private int screenHeight = 12;
-		
+
 		// Map X and Y coordinates of the tile displayed in the top left corner
 		private int x = 0, y = 0;
 		// Data for the selected sector
@@ -385,14 +407,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private int sectorPal;
 		private boolean grid = true;
 		private boolean spriteBoxes = true;
-		
+
 		// Moving stuff
 		private int movingDrawX, movingDrawY;
 		private int movingNPC = -1;
 		private Image movingNPCimg;
 		private int[] movingNPCdim;
 		private MapData.Door movingDoor = null;
-		
+
 		// Popup menus
 		private int popupX, popupY;
 		private JPopupMenu spritePopupMenu, doorPopupMenu;
@@ -401,103 +423,112 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private MapData.SpriteEntry popupSE;
 		private JMenuItem delDoor, cutDoor, copyDoor, editDoor;
 		private MapData.Door popupDoor, copiedDoor;
-		
+
 		// Seeking stuff
 		private int seekDrawX, seekDrawY;
 		private DoorEditor doorSeeker;
-		
+
 		// Editing hotspot
 		private MapData.Hotspot editHS = null;
 		private int editHSx1, editHSy1;
 		private int hsMouseX, hsMouseY;
-		
+
 		// Mode settings
 		private int previousMode = 0;
+		private int togglePreviousMode = -1;
 		private boolean editMap = true, drawTileNums = false;
-		private boolean drawSprites = false, editSprites = false, drawSpriteNums = true;
+		private boolean drawSprites = false, editSprites = false,
+				drawSpriteNums = true;
 		private boolean drawDoors = false, editDoors = false, seekDoor = false;
 		private boolean drawEnemies = false, editEnemies = false;
 		private boolean drawHotspots = false, editHotspots = false;
 		private boolean gamePreview = false;
-		
+		private boolean tvPreview = false;
+		private int tvPreviewX, tvPreviewY, tvPreviewW, tvPreviewH;
+
 		// Cache enemy colors
 		public static Color[] enemyColors = null;
-		
+
 		private TileSelector tileSelector;
-		
-		public MapDisplay(MapData map, JMenuItem copySector, JMenuItem pasteSector, JMenuItem undoButton, JMenuItem redoButton) {
+
+		public MapDisplay(MapData map, JMenuItem copySector,
+				JMenuItem pasteSector, JMenuItem undoButton,
+				JMenuItem redoButton, YMLPreferences prefs) {
 			super();
-			
+
 			if (enemyColors == null) {
 				enemyColors = new Color[203];
 				for (int i = 0; i < 203; ++i)
-					enemyColors[i] = new Color(((int) (Math.E * 0x100000 * i)) & 0xffffff);
+					enemyColors[i] = new Color(
+							((int) (Math.E * 0x100000 * i)) & 0xffffff);
 			}
-			
+
+			this.prefs = prefs;
+
 			this.map = map;
 			this.copySector = copySector;
 			this.pasteSector = pasteSector;
 			this.undoButton = undoButton;
 			this.redoButton = redoButton;
-			
+
 			if (tileImageCache == null)
 				resetTileImageCache();
-			
+
 			// Create Sprite popup menu
 			spritePopupMenu = new JPopupMenu();
-			spritePopupMenu.add(ToolModule.createJMenuItem("New NPC",
-						'n', null, "newNPC", this));
-			spritePopupMenu.add(delNPC = ToolModule.createJMenuItem("Delete NPC",
-					'd', null, "delNPC", this));
+			spritePopupMenu.add(ToolModule.createJMenuItem("New NPC", 'n',
+					null, "newNPC", this));
+			spritePopupMenu.add(delNPC = ToolModule.createJMenuItem(
+					"Delete NPC", 'd', null, "delNPC", this));
 			spritePopupMenu.add(cutNPC = ToolModule.createJMenuItem("Cut NPC",
 					'u', null, "cutNPC", this));
-			spritePopupMenu.add(copyNPC = ToolModule.createJMenuItem("Copy NPC",
-					'c', null, "copyNPC", this));
-			spritePopupMenu.add(ToolModule.createJMenuItem("Paste NPC",
-					'p', null, "pasteNPC", this));
-			spritePopupMenu.add(switchNPC = ToolModule.createJMenuItem("Switch NPC",
-					'p', null, "switchNPC", this));
-			
+			spritePopupMenu.add(copyNPC = ToolModule.createJMenuItem(
+					"Copy NPC", 'c', null, "copyNPC", this));
+			spritePopupMenu.add(ToolModule.createJMenuItem("Paste NPC", 'p',
+					null, "pasteNPC", this));
+			spritePopupMenu.add(switchNPC = ToolModule.createJMenuItem(
+					"Switch NPC", 'p', null, "switchNPC", this));
+
 			// Create Door popup menu
 			doorPopupMenu = new JPopupMenu();
-			doorPopupMenu.add(ToolModule.createJMenuItem("New door",
-					'n', null, "newDoor", this));
-			doorPopupMenu.add(delDoor = ToolModule.createJMenuItem("Delete door",
-					'd', null, "delDoor", this));
+			doorPopupMenu.add(ToolModule.createJMenuItem("New door", 'n', null,
+					"newDoor", this));
+			doorPopupMenu.add(delDoor = ToolModule.createJMenuItem(
+					"Delete door", 'd', null, "delDoor", this));
 			doorPopupMenu.add(cutDoor = ToolModule.createJMenuItem("Cut Door",
 					'u', null, "cutDoor", this));
-			doorPopupMenu.add(copyDoor = ToolModule.createJMenuItem("Copy Door",
-					'c', null, "copyDoor", this));
-			doorPopupMenu.add(ToolModule.createJMenuItem("Paste Door",
-					'p', null, "pasteDoor", this));
-			doorPopupMenu.add(editDoor = ToolModule.createJMenuItem("Edit door",
-					'e', null, "editDoor", this));
-			
+			doorPopupMenu.add(copyDoor = ToolModule.createJMenuItem(
+					"Copy Door", 'c', null, "copyDoor", this));
+			doorPopupMenu.add(ToolModule.createJMenuItem("Paste Door", 'p',
+					null, "pasteDoor", this));
+			doorPopupMenu.add(editDoor = ToolModule.createJMenuItem(
+					"Edit door", 'e', null, "editDoor", this));
+
 			addMouseListener(this);
 			addMouseMotionListener(this);
-			
+
 			setPreferredSize(new Dimension(
-					screenWidth * MapData.TILE_WIDTH + 2,
-					screenHeight * MapData.TILE_HEIGHT + 2));
+					screenWidth * MapData.TILE_WIDTH + 2, screenHeight
+							* MapData.TILE_HEIGHT + 2));
 		}
-		
+
 		public void init() {
-			selectSector(0,0);
+			selectSector(0, 0);
 			changeMode(0);
 			reset();
 		}
-		
+
 		public void reset() {
 			undoStack.clear();
 			undoButton.setEnabled(false);
 			redoStack.clear();
 			redoButton.setEnabled(false);
 		}
-		
+
 		public void setTileSelector(TileSelector tileSelector) {
 			this.tileSelector = tileSelector;
 		}
-		
+
 		public void paintComponent(Graphics g) {
 			super.paintComponent(g);
 			Graphics2D g2d = (Graphics2D) g;
@@ -506,290 +537,317 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			else {
 				// Draw border
 				g2d.setColor(Color.black);
-				g2d.draw(new Rectangle2D.Double(0, 0,
-						screenWidth * MapData.TILE_WIDTH + 2,
-						screenHeight * MapData.TILE_HEIGHT + 2));
+				g2d.draw(new Rectangle2D.Double(0, 0, screenWidth
+						* MapData.TILE_WIDTH + 2, screenHeight
+						* MapData.TILE_HEIGHT + 2));
 			}
 		}
-		
+
 		private void drawMap(Graphics2D g) {
 			int i, j, a;
 			g.setPaint(Color.white);
 			g.setFont(new Font("Arial", Font.PLAIN, 12));
-			
+
 			MapData.Sector sector;
 			int pal;
 			for (i = 0; i < screenHeight; i++) {
 				for (j = 0; j < screenWidth; j++) {
-
-					sector = map.getSector(
-							(j + x)/MapData.SECTOR_WIDTH,
-							(i + y)/MapData.SECTOR_HEIGHT);
-					pal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(sector.tileset)].getPaletteNum(
-							sector.tileset, sector.palette);
+					sector = map.getSector((j + x) / MapData.SECTOR_WIDTH,
+							(i + y) / MapData.SECTOR_HEIGHT);
+					pal = TileEditor.tilesets[TileEditor
+							.getDrawTilesetNumber(sector.tileset)]
+							.getPaletteNum(sector.tileset, sector.palette);
 					g.drawImage(
-							getTileImage(TileEditor.getDrawTilesetNumber(sector.tileset),
-									map.getMapTile(x+j, y+i), pal),
-							j*MapData.TILE_WIDTH + 1, i*MapData.TILE_HEIGHT + 1,
-							MapData.TILE_WIDTH, MapData.TILE_HEIGHT,
-							this);
+							getTileImage(TileEditor
+									.getDrawTilesetNumber(sector.tileset), map
+									.getMapTile(x + j, y + i), pal), j
+									* MapData.TILE_WIDTH + 1, i
+									* MapData.TILE_HEIGHT + 1,
+							MapData.TILE_WIDTH, MapData.TILE_HEIGHT, this);
 					if (drawTileNums && !gamePreview) {
-						drawNumber(g, map.getMapTile(x+j, y+i), j * MapData.TILE_WIDTH + 1,
-								i * MapData.TILE_HEIGHT + 1, false, false);
+						drawNumber(g, map.getMapTile(x + j, y + i), j
+								* MapData.TILE_WIDTH + 1, i
+								* MapData.TILE_HEIGHT + 1, false, false);
 					}
 				}
 			}
-			
+
 			if (grid && !gamePreview)
 				drawGrid(g);
-			
+
 			if (editMap && (selectedSector != null)) {
 				int sXt, sYt;
-				if (((sXt = sectorX * MapData.SECTOR_WIDTH) + MapData.SECTOR_WIDTH >= x)
-						&& (sXt < x+screenWidth)
-						&& ((sYt = sectorY * MapData.SECTOR_HEIGHT) + MapData.SECTOR_HEIGHT >= y)
-						&& (sYt < y+screenHeight)) {
+				if (((sXt = sectorX * MapData.SECTOR_WIDTH)
+						+ MapData.SECTOR_WIDTH >= x)
+						&& (sXt < x + screenWidth)
+						&& ((sYt = sectorY * MapData.SECTOR_HEIGHT)
+								+ MapData.SECTOR_HEIGHT >= y)
+						&& (sYt < y + screenHeight)) {
 					g.setPaint(Color.yellow);
-					g.draw(new Rectangle2D.Double(
-							(sXt - x) * MapData.TILE_WIDTH + 1,
-							(sYt - y) * MapData.TILE_HEIGHT + 1,
-							MapData.SECTOR_WIDTH * MapData.TILE_WIDTH,
-							MapData.SECTOR_HEIGHT * MapData.TILE_HEIGHT));
+					g.draw(new Rectangle2D.Double((sXt - x)
+							* MapData.TILE_WIDTH + 1, (sYt - y)
+							* MapData.TILE_HEIGHT + 1, MapData.SECTOR_WIDTH
+							* MapData.TILE_WIDTH, MapData.SECTOR_HEIGHT
+							* MapData.TILE_HEIGHT));
 				}
 			}
-			
+
 			// Draw border
 			g.setColor(Color.black);
-			g.draw(new Rectangle2D.Double(0, 0,
-					screenWidth * MapData.TILE_WIDTH + 2,
-					screenHeight * MapData.TILE_HEIGHT + 2));
-			
+			g.draw(new Rectangle2D.Double(0, 0, screenWidth
+					* MapData.TILE_WIDTH + 2, screenHeight
+					* MapData.TILE_HEIGHT + 2));
+
 			if (drawSprites) {
 				MapData.NPC npc;
 				int[] wh;
 				List<MapData.SpriteEntry> area;
-				for (i = y&(~7); i < (y&(~7)) + screenHeight + 8; i += 8) {
-					for (j = x&(~7); j < (x&(~7)) + screenWidth + 8; j += 8) {
+				for (i = y & (~7); i < (y & (~7)) + screenHeight + 8; i += 8) {
+					for (j = x & (~7); j < (x & (~7)) + screenWidth + 8; j += 8) {
 						try {
-							area = map.getSpriteArea(j>>3, i>>3);
+							area = map.getSpriteArea(j >> 3, i >> 3);
 							for (MapData.SpriteEntry e : area) {
 								npc = map.getNPC(e.npcID);
 								wh = map.getSpriteWH(npc.sprite);
 								if (spriteBoxes && !gamePreview) {
 									g.setPaint(Color.RED);
-									g.draw(new Rectangle2D.Double(
-											e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
-											e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 8,
-											wh[0]+1, wh[1]+1));
+									g.draw(new Rectangle2D.Double(e.x + (j - x)
+											* MapData.TILE_WIDTH - wh[0] / 2,
+											e.y + (i - y) * MapData.TILE_HEIGHT
+													- wh[1] + 8, wh[0] + 1,
+											wh[1] + 1));
 								}
-								g.drawImage(map.getSpriteImage(npc.sprite, npc.direction),
-										e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2 + 1,
-										e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 9,
-										this);
+								g.drawImage(map.getSpriteImage(npc.sprite,
+										npc.direction), e.x + (j - x)
+										* MapData.TILE_WIDTH - wh[0] / 2 + 1,
+										e.y + (i - y) * MapData.TILE_HEIGHT
+												- wh[1] + 9, this);
 								if (drawSpriteNums && !gamePreview) {
-									drawNumber(g, e.npcID,
-											e.x + (j-x)*MapData.TILE_WIDTH - wh[0]/2,
-											e.y + (i-y)*MapData.TILE_HEIGHT - wh[1] + 8,
-											false, true);
+									drawNumber(g, e.npcID, e.x + (j - x)
+											* MapData.TILE_WIDTH - wh[0] / 2,
+											e.y + (i - y) * MapData.TILE_HEIGHT
+													- wh[1] + 8, false, true);
 								}
 							}
 						} catch (Exception e) {
-							
+
 						}
 					}
 				}
-				
+
 				if (editSprites && (movingNPC != -1)) {
 					if (spriteBoxes) {
 						g.setPaint(Color.RED);
-						g.draw(new Rectangle2D.Double(
-								movingDrawX-1, movingDrawY-1,
-								movingNPCdim[0]+1, movingNPCdim[1]+1));
+						g.draw(new Rectangle2D.Double(movingDrawX - 1,
+								movingDrawY - 1, movingNPCdim[0] + 1,
+								movingNPCdim[1] + 1));
 					}
 					g.drawImage(movingNPCimg, movingDrawX, movingDrawY, this);
 				}
 			}
-			
+
 			if (drawDoors) {
 				List<MapData.Door> area;
-				for (i = y&(~7); i < (y&(~7)) + screenHeight + 8; i += 8) {
-					for (j = x&(~7); j < (x&(~7)) + screenWidth + 8; j += 8) {
+				for (i = y & (~7); i < (y & (~7)) + screenHeight + 8; i += 8) {
+					for (j = x & (~7); j < (x & (~7)) + screenWidth + 8; j += 8) {
 						try {
-							area = map.getDoorArea(j>>3, i>>3);
+							area = map.getDoorArea(j >> 3, i >> 3);
 							for (MapData.Door e : area) {
 								g.setPaint(Color.WHITE);
-								g.draw(new Rectangle2D.Double(
-										e.x*8 + (j-x)*MapData.TILE_WIDTH + 1,
-										e.y*8 + (i-y)*MapData.TILE_HEIGHT + 1,
-										8, 8));
-								g.draw(new Rectangle2D.Double(
-										e.x*8 + (j-x)*MapData.TILE_WIDTH + 3,
-										e.y*8 + (i-y)*MapData.TILE_HEIGHT + 3,
-										4, 4));
+								g.draw(new Rectangle2D.Double(e.x * 8 + (j - x)
+										* MapData.TILE_WIDTH + 1, e.y * 8
+										+ (i - y) * MapData.TILE_HEIGHT + 1, 8,
+										8));
+								g.draw(new Rectangle2D.Double(e.x * 8 + (j - x)
+										* MapData.TILE_WIDTH + 3, e.y * 8
+										+ (i - y) * MapData.TILE_HEIGHT + 3, 4,
+										4));
 								g.setPaint(Color.BLUE);
-								g.draw(new Rectangle2D.Double(
-										e.x*8 + (j-x)*MapData.TILE_WIDTH + 2,
-										e.y*8 + (i-y)*MapData.TILE_HEIGHT + 2,
-										6, 6));
+								g.draw(new Rectangle2D.Double(e.x * 8 + (j - x)
+										* MapData.TILE_WIDTH + 2, e.y * 8
+										+ (i - y) * MapData.TILE_HEIGHT + 2, 6,
+										6));
 							}
 						} catch (Exception e) {
-							
+
 						}
 					}
 				}
-				
+
 				if (editDoors && (movingDoor != null)) {
 					g.setPaint(Color.WHITE);
-					g.draw(new Rectangle2D.Double(
-							movingDrawX + 1, movingDrawY + 1, 8, 8));
-					g.draw(new Rectangle2D.Double(
-							movingDrawX + 3, movingDrawY + 3, 4, 4));
+					g.draw(new Rectangle2D.Double(movingDrawX + 1,
+							movingDrawY + 1, 8, 8));
+					g.draw(new Rectangle2D.Double(movingDrawX + 3,
+							movingDrawY + 3, 4, 4));
 					g.setPaint(Color.BLUE);
-					g.draw(new Rectangle2D.Double(
-							movingDrawX + 2, movingDrawY + 2, 6, 6));
+					g.draw(new Rectangle2D.Double(movingDrawX + 2,
+							movingDrawY + 2, 6, 6));
 				}
-				
+
 				if (seekDoor) {
 					g.setPaint(Color.WHITE);
-					g.draw(new Rectangle2D.Double(
-							seekDrawX + 1, seekDrawY + 1, 8, 8));
-					g.draw(new Rectangle2D.Double(
-							seekDrawX + 3, seekDrawY + 3, 4, 4));
+					g.draw(new Rectangle2D.Double(seekDrawX + 1, seekDrawY + 1,
+							8, 8));
+					g.draw(new Rectangle2D.Double(seekDrawX + 3, seekDrawY + 3,
+							4, 4));
 					g.setPaint(Color.MAGENTA);
-					g.draw(new Rectangle2D.Double(
-							seekDrawX + 2, seekDrawY + 2, 6, 6));
+					g.draw(new Rectangle2D.Double(seekDrawX + 2, seekDrawY + 2,
+							6, 6));
 				}
 			}
-			
+
 			if (drawEnemies) {
 				g.setFont(new Font("Arial", Font.PLAIN, 12));
-				for (i = -(y%2); i < screenHeight; i += 2) {
-					for (j = -(x%2); j < screenWidth; j += 2) {
-						a = map.getMapEnemyGroup((x+j)/2, (y+i)/2);
+				for (i = -(y % 2); i < screenHeight; i += 2) {
+					for (j = -(x % 2); j < screenWidth; j += 2) {
+						a = map.getMapEnemyGroup((x + j) / 2, (y + i) / 2);
 						if (a != 0) {
 							g.setComposite(AlphaComposite.getInstance(
 									AlphaComposite.SRC_OVER, 0.5F));
 							g.setPaint(enemyColors[a]);
-							g.fill(new Rectangle2D.Double(
-									j * MapData.TILE_WIDTH + 1,
-									i * MapData.TILE_HEIGHT + 1,
-									MapData.TILE_WIDTH*2, MapData.TILE_HEIGHT*2));
-							
+							g.fill(new Rectangle2D.Double(j
+									* MapData.TILE_WIDTH + 1, i
+									* MapData.TILE_HEIGHT + 1,
+									MapData.TILE_WIDTH * 2,
+									MapData.TILE_HEIGHT * 2));
+
 							g.setComposite(AlphaComposite.getInstance(
 									AlphaComposite.SRC_OVER, 1.0F));
-							/*g.setPaint(Color.black);
-							message = addZeros(Integer.toString(a), 3);
-							rect = g.getFontMetrics().getStringBounds(message, g);
-							rect.setRect(
-									j * MapData.TILE_WIDTH + 1,
-									i * MapData.TILE_HEIGHT + 1,
-									rect.getWidth(), rect.getHeight());
-							g.fill(rect);
-							g.setPaint(Color.white);
-							g.drawString(message,
-									(float) (j * MapData.TILE_WIDTH + 1),
-									(float) (i * MapData.TILE_HEIGHT + rect.getHeight()));*/
-							drawNumber(g, a, j * MapData.TILE_WIDTH + 1,
-									i * MapData.TILE_HEIGHT + 1, false, false);
+							/*
+							 * g.setPaint(Color.black); message =
+							 * addZeros(Integer.toString(a), 3); rect =
+							 * g.getFontMetrics().getStringBounds(message, g);
+							 * rect.setRect( j * MapData.TILE_WIDTH + 1, i *
+							 * MapData.TILE_HEIGHT + 1, rect.getWidth(),
+							 * rect.getHeight()); g.fill(rect);
+							 * g.setPaint(Color.white); g.drawString(message,
+							 * (float) (j * MapData.TILE_WIDTH + 1), (float) (i
+							 * * MapData.TILE_HEIGHT + rect.getHeight()));
+							 */
+							drawNumber(g, a, j * MapData.TILE_WIDTH + 1, i
+									* MapData.TILE_HEIGHT + 1, false, false);
 						}
 					}
 				}
 			}
-			
+
 			if (drawHotspots) {
 				MapData.Hotspot hs;
 				g.setComposite(AlphaComposite.getInstance(
 						AlphaComposite.SRC_OVER, 0.8F));
 				int tx1, ty1, tx2, ty2;
-				for (i=0; i<map.numHotspots(); ++i) {
+				for (i = 0; i < map.numHotspots(); ++i) {
 					hs = map.getHotspot(i);
 					if (hs == editHS)
 						continue;
-					tx1 = hs.x1/4 - x; ty1 = hs.y1/4 - y;
-					tx2 = hs.x2/4 - x; ty2 = hs.y2/4 - y;
-					if (((tx1 >= 0) && (tx1 <= screenWidth)
-							&& (ty1 >= 0) && (ty1 <= screenHeight))
+					tx1 = hs.x1 / 4 - x;
+					ty1 = hs.y1 / 4 - y;
+					tx2 = hs.x2 / 4 - x;
+					ty2 = hs.y2 / 4 - y;
+					if (((tx1 >= 0) && (tx1 <= screenWidth) && (ty1 >= 0) && (ty1 <= screenHeight))
 							|| ((tx2 >= 0) && (tx2 <= screenWidth)
 									&& (ty2 >= 0) && (ty2 <= screenHeight))) {
 						g.setPaint(Color.PINK);
-						g.fill(new Rectangle2D.Double(
-								hs.x1 * 8 - x * MapData.TILE_WIDTH + 1,
-								hs.y1 * 8 - y * MapData.TILE_HEIGHT + 1,
-								(hs.x2 - hs.x1) * 8,
+						g.fill(new Rectangle2D.Double(hs.x1 * 8 - x
+								* MapData.TILE_WIDTH + 1, hs.y1 * 8 - y
+								* MapData.TILE_HEIGHT + 1, (hs.x2 - hs.x1) * 8,
 								(hs.y2 - hs.y1) * 8));
 						drawNumber(g, i,
-								hs.x1 * 8 - x * MapData.TILE_WIDTH + 1,
-								hs.y1 * 8 - y * MapData.TILE_HEIGHT + 1,
+								hs.x1 * 8 - x * MapData.TILE_WIDTH + 1, hs.y1
+										* 8 - y * MapData.TILE_HEIGHT + 1,
 								false, false);
 					}
 				}
-				
+
 				if (editHotspots && (editHS != null)) {
 					g.setPaint(Color.WHITE);
 					if (editHSx1 != -1) {
 						tx1 = editHSx1 * 8 - x * MapData.TILE_WIDTH + 1;
 						ty1 = editHSy1 * 8 - y * MapData.TILE_HEIGHT + 1;
-						g.fill(new Rectangle2D.Double(
-								tx1, ty1,
-								hsMouseX - tx1, hsMouseY - ty1));
+						g.fill(new Rectangle2D.Double(tx1, ty1, hsMouseX - tx1,
+								hsMouseY - ty1));
 					} else {
-						g.fill(new Rectangle2D.Double(
-								hsMouseX+1, hsMouseY+1, 65, 65));
+						g.fill(new Rectangle2D.Double(hsMouseX + 1,
+								hsMouseY + 1, 65, 65));
 					}
 				}
 			}
+
+			if (gamePreview && tvPreview) {
+				g.setComposite(AlphaComposite.getInstance(
+						AlphaComposite.SRC_OVER, 1.0F));
+				g.setColor(Color.BLACK);
+				g.fillRect(0, 0, tvPreviewX - tvPreviewW, screenHeight
+						* MapData.TILE_HEIGHT);
+				g.fillRect(tvPreviewX + tvPreviewW, 0,
+						(screenWidth * MapData.TILE_WIDTH) - tvPreviewX
+								- tvPreviewW, screenHeight
+								* MapData.TILE_HEIGHT);
+				g.fillRect(0, 0, screenWidth * MapData.TILE_WIDTH, tvPreviewY
+						- tvPreviewH);
+				g.fillRect(0, tvPreviewY + tvPreviewH, screenWidth
+						* MapData.TILE_WIDTH,
+						(screenHeight * MapData.TILE_HEIGHT) - tvPreviewY
+								- tvPreviewH);
+
+				// hardcoded for sprite of size 16,24
+				g.drawImage(map.getSpriteImage(1, 2), tvPreviewX - 7,
+						tvPreviewY - 15, this);
+			}
 		}
-		
+
 		private Rectangle2D textBG;
-		private void drawNumber(Graphics2D g, int n, int x, int y,
-				boolean hex, boolean above) {
+
+		private void drawNumber(Graphics2D g, int n, int x, int y, boolean hex,
+				boolean above) {
 			String s;
 			if (hex)
 				s = addZeros(Integer.toHexString(n), 4);
 			else
 				s = addZeros(Integer.toString(n), 4);
-			
+
 			if (textBG == null)
 				textBG = g.getFontMetrics().getStringBounds(s, g);
 
 			g.setPaint(Color.black);
 			if (above) {
-				textBG.setRect(x, y-textBG.getHeight(), textBG.getWidth(), textBG.getHeight());
+				textBG.setRect(x, y - textBG.getHeight(), textBG.getWidth(),
+						textBG.getHeight());
 				g.fill(textBG);
 				g.setPaint(Color.white);
-				g.drawString(s,
-						x,
-						y);
+				g.drawString(s, x, y);
 			} else {
 				textBG.setRect(x, y, textBG.getWidth(), textBG.getHeight());
 				g.fill(textBG);
 				g.setPaint(Color.white);
-				g.drawString(s,
-						x,
-						y + ((int) textBG.getHeight()));
+				g.drawString(s, x, y + ((int) textBG.getHeight()));
 			}
 		}
-		
+
 		private void drawGrid(Graphics2D g) {
 			g.setPaint(Color.black);
 			// Draw vertical lines
-			for (int i = 0; i < screenWidth+1; i++)
-				g.drawLine(1 + i * MapData.TILE_WIDTH, 1, 1 + i * MapData.TILE_WIDTH, screenHeight * MapData.TILE_HEIGHT);
+			for (int i = 0; i < screenWidth + 1; i++)
+				g.drawLine(1 + i * MapData.TILE_WIDTH, 1, 1 + i
+						* MapData.TILE_WIDTH, screenHeight
+						* MapData.TILE_HEIGHT);
 			// Draw horizontal lines
-			for (int i = 0; i < screenHeight+1; i++)
-				g.drawLine(1, 1 + i * MapData.TILE_HEIGHT, screenWidth * MapData.TILE_WIDTH, 1 + i * MapData.TILE_HEIGHT);
-			
+			for (int i = 0; i < screenHeight + 1; i++)
+				g.drawLine(1, 1 + i * MapData.TILE_HEIGHT, screenWidth
+						* MapData.TILE_WIDTH, 1 + i * MapData.TILE_HEIGHT);
+
 			// Blank pixel in the bottom right corner
-			g.drawLine(screenWidth * MapData.TILE_WIDTH + 1,
-					screenHeight * MapData.TILE_HEIGHT + 1,
-					screenWidth * MapData.TILE_WIDTH + 1,
-					screenHeight * MapData.TILE_HEIGHT + 1);
+			g.drawLine(screenWidth * MapData.TILE_WIDTH + 1, screenHeight
+					* MapData.TILE_HEIGHT + 1, screenWidth * MapData.TILE_WIDTH
+					+ 1, screenHeight * MapData.TILE_HEIGHT + 1);
 		}
-		
-		public static Image getTileImage(int loadtset, int loadtile, int loadpalette) {
+
+		public static Image getTileImage(int loadtset, int loadtile,
+				int loadpalette) {
 			if (tileImageCache[loadtset][loadtile][loadpalette] == null) {
-				tileImageCache[loadtset][loadtile][loadpalette] =
-					TileEditor.tilesets[loadtset].getArrangementImage(loadtile, loadpalette);
+				tileImageCache[loadtset][loadtile][loadpalette] = TileEditor.tilesets[loadtset]
+						.getArrangementImage(loadtile, loadpalette);
 			}
 			return tileImageCache[loadtset][loadtile][loadpalette];
 		}
@@ -797,70 +855,80 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public static void resetTileImageCache() {
 			tileImageCache = new Image[TileEditor.NUM_TILESETS][1024][59];
 		}
-		
+
 		public int getScreenWidth() {
 			return screenWidth;
 		}
-		
+
 		public int getScreenHeight() {
 			return screenHeight;
 		}
-		
+
 		public MapData.Sector getSelectedSector() {
 			return selectedSector;
 		}
-		
+
 		public void setSelectedSectorTileset(int tset) {
 			selectedSector.tileset = tset;
-			sectorPal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(selectedSector.tileset)].getPaletteNum(
-					selectedSector.tileset, selectedSector.palette);
+			sectorPal = TileEditor.tilesets[TileEditor
+					.getDrawTilesetNumber(selectedSector.tileset)]
+					.getPaletteNum(selectedSector.tileset,
+							selectedSector.palette);
 		}
-		
+
 		public void setSelectedSectorPalette(int pal) {
 			selectedSector.palette = pal;
-			sectorPal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(selectedSector.tileset)].getPaletteNum(
-					selectedSector.tileset, selectedSector.palette);
+			sectorPal = TileEditor.tilesets[TileEditor
+					.getDrawTilesetNumber(selectedSector.tileset)]
+					.getPaletteNum(selectedSector.tileset,
+							selectedSector.palette);
 		}
-		
+
 		public int getSelectedSectorPalNumber() {
 			return sectorPal;
 		}
-		
+
 		public void setMapXY(int x, int y) {
 			x = Math.max(0, x);
 			y = Math.max(0, y);
-			this.x = Math.min(x, MapData.WIDTH_IN_TILES-screenWidth);
-			this.y = Math.min(y, MapData.HEIGHT_IN_TILES-screenHeight);
+			this.x = Math.min(x, MapData.WIDTH_IN_TILES - screenWidth);
+			this.y = Math.min(y, MapData.HEIGHT_IN_TILES - screenHeight);
 		}
-		
+
+		public void setMapX(int x) {
+			setMapXY(x, y);
+		}
+
 		public void setMapY(int y) {
-			this.y = y;
+			setMapXY(x, y);
 		}
-		
+
 		public int getMapX() {
 			return x;
 		}
-		
+
 		public int getMapY() {
 			return y;
 		}
-		
+
 		public int getSectorX() {
 			return sectorX;
 		}
-		
+
 		public int getSectorY() {
 			return sectorY;
 		}
-		
+
 		private void selectSector(int sX, int sY) {
 			sectorX = sX;
 			sectorY = sY;
 			MapData.Sector newS = map.getSector(sectorX, sectorY);
 			if (selectedSector != newS) {
 				selectedSector = newS;
-				sectorPal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(selectedSector.tileset)].getPaletteNum(
-						selectedSector.tileset, selectedSector.palette);
+				sectorPal = TileEditor.tilesets[TileEditor
+						.getDrawTilesetNumber(selectedSector.tileset)]
+						.getPaletteNum(selectedSector.tileset,
+								selectedSector.palette);
 				copySector.setEnabled(true);
 				pasteSector.setEnabled(true);
 			} else {
@@ -875,8 +943,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 
 		public void mouseClicked(MouseEvent e) {
 			// Make sure they didn't click on the border
-			if ((e.getX() >= 1) && (e.getX() <= screenWidth * MapData.TILE_WIDTH + 2)
-					&& (e.getY() >= 1) && (e.getY() <= screenHeight * MapData.TILE_HEIGHT + 2)) {
+			if ((e.getX() >= 1)
+					&& (e.getX() <= screenWidth * MapData.TILE_WIDTH + 2)
+					&& (e.getY() >= 1)
+					&& (e.getY() <= screenHeight * MapData.TILE_HEIGHT + 2)) {
 				if (editMap) {
 					if (e.getButton() == MouseEvent.BUTTON1) {
 						int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
@@ -885,17 +955,22 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							tileSelector.selectTile(map.getMapTile(mX, mY));
 						} else {
 							// Keep track of the undo stuff
-							undoStack.push(new UndoableTileChange(mX, mY, map.getMapTile(mX, mY), tileSelector.getSelectedTile()));
+							undoStack.push(new UndoableTileChange(mX, mY, map
+									.getMapTile(mX, mY), tileSelector
+									.getSelectedTile()));
 							undoButton.setEnabled(true);
 							redoStack.clear();
-							
-							map.setMapTile(mX, mY, tileSelector.getSelectedTile());
+
+							map.setMapTile(mX, mY,
+									tileSelector.getSelectedTile());
 							repaint();
 						}
 					} else if (e.getButton() == MouseEvent.BUTTON3) {
 						// Make sure they didn't click on the border
-						int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH)) / MapData.SECTOR_WIDTH;
-						int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT)) / MapData.SECTOR_HEIGHT;
+						int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH))
+								/ MapData.SECTOR_WIDTH;
+						int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT))
+								/ MapData.SECTOR_HEIGHT;
 						selectSector(sX, sY);
 					}
 				} else if (editSprites) {
@@ -913,7 +988,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							delNPC.setEnabled(true);
 							cutNPC.setEnabled(true);
 							copyNPC.setEnabled(true);
-							switchNPC.setText("Switch NPC (" + popupSE.npcID + ")");
+							switchNPC.setText("Switch NPC (" + popupSE.npcID
+									+ ")");
 							switchNPC.setEnabled(true);
 						}
 						spritePopupMenu.show(this, e.getX(), e.getY());
@@ -937,23 +1013,24 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 						doorPopupMenu.show(this, e.getX(), e.getY());
 					}
 				} else if (seekDoor) {
-					doorSeeker.seek(x*4 + seekDrawX/8,
-							y*4 + seekDrawY/8);
+					doorSeeker.seek(x * 4 + seekDrawX / 8, y * 4 + seekDrawY
+							/ 8);
 					doorSeeker = null;
 					changeMode(previousMode);
 					repaint();
 				} else if (editEnemies) {
-					int eX = ((e.getX() - 1) / MapData.TILE_WIDTH + x)/2;
-					int eY = ((e.getY() - 1) / MapData.TILE_HEIGHT + y)/2;
+					int eX = ((e.getX() - 1) / MapData.TILE_WIDTH + x) / 2;
+					int eY = ((e.getY() - 1) / MapData.TILE_HEIGHT + y) / 2;
 					if (e.isShiftDown()) {
 						tileSelector.selectTile(map.getMapEnemyGroup(eX, eY));
 					} else {
-						map.setMapEnemyGroup(eX, eY, tileSelector.getSelectedTile());
+						map.setMapEnemyGroup(eX, eY,
+								tileSelector.getSelectedTile());
 						repaint();
 					}
 				} else if (editHotspots) {
-					int mx = ((e.getX() - 1) / 8) + (x * 4),
-							my = ((e.getY() - 1) / 8) + (y * 4);
+					int mx = ((e.getX() - 1) / 8) + (x * 4), my = ((e.getY() - 1) / 8)
+							+ (y * 4);
 					if (editHS != null) {
 						if (editHSx1 == -1) {
 							editHSx1 = mx;
@@ -968,10 +1045,10 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							repaint();
 						}
 					} else {
-						for (int i=0; i<map.numHotspots(); ++i) {
+						for (int i = 0; i < map.numHotspots(); ++i) {
 							MapData.Hotspot hs = map.getHotspot(i);
-							if ((mx >= hs.x1) && (mx <= hs.x2)
-									&& (my >= hs.y1) && (my <= hs.y2)) {
+							if ((mx >= hs.x1) && (mx <= hs.x2) && (my >= hs.y1)
+									&& (my <= hs.y2)) {
 								editHS = hs;
 								editHSx1 = editHSy1 = -1;
 								hsMouseX = e.getX() & (~7);
@@ -984,7 +1061,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				}
 			}
 		}
-		
+
 		public void actionPerformed(ActionEvent ae) {
 			if (ae.getActionCommand().equals("newNPC")) {
 				pushNpcIdFromMouseXY(0, popupX, popupY);
@@ -1002,8 +1079,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				repaint();
 			} else if (ae.getActionCommand().equals("switchNPC")) {
 				String input = JOptionPane.showInputDialog(this,
-								"Switch this to a different NPC",
-								popupSE.npcID);
+						"Switch this to a different NPC", popupSE.npcID);
 				if (input != null) {
 					popupSE.npcID = Integer.parseInt(input);
 					repaint();
@@ -1023,93 +1099,119 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				pushDoorFromMouseXY(copiedDoor.copy(), popupX, popupY);
 				repaint();
 			} else if (ae.getActionCommand().equals("editDoor")) {
-				ebhack.Ebhack.main.showModule(DoorEditor.class,
-						popupDoor);
+				ebhack.Ebhack.main.showModule(DoorEditor.class, popupDoor);
 			}
 		}
-		
+
 		// Sprites
-		private MapData.SpriteEntry getSpriteEntryFromMouseXY(int mouseX, int mouseY) {
-			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
-					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
-			mouseX += (x%8) * MapData.TILE_WIDTH;
+		private MapData.SpriteEntry getSpriteEntryFromMouseXY(int mouseX,
+				int mouseY) {
+			int areaX = (x + mouseX / MapData.TILE_WIDTH) / 8, areaY = (y + mouseY
+					/ MapData.TILE_HEIGHT) / 8;
+			mouseX += (x % 8) * MapData.TILE_WIDTH;
 			mouseX %= (MapData.TILE_WIDTH * 8);
-			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY += (y % 8) * MapData.TILE_HEIGHT;
 			mouseY %= (MapData.TILE_HEIGHT * 8);
 			return map.getSpriteEntryFromCoords(areaX, areaY, mouseX, mouseY);
 		}
 
 		private int popNpcIdFromMouseXY(int mouseX, int mouseY) {
-			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
-					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
-			mouseX += (x%8) * MapData.TILE_WIDTH;
+			int areaX = (x + mouseX / MapData.TILE_WIDTH) / 8, areaY = (y + mouseY
+					/ MapData.TILE_HEIGHT) / 8;
+			mouseX += (x % 8) * MapData.TILE_WIDTH;
 			mouseX %= (MapData.TILE_WIDTH * 8);
-			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY += (y % 8) * MapData.TILE_HEIGHT;
 			mouseY %= (MapData.TILE_HEIGHT * 8);
 			return map.popNPCFromCoords(areaX, areaY, mouseX, mouseY);
 		}
-		
+
 		private void pushNpcIdFromMouseXY(int npc, int mouseX, int mouseY) {
-			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
-					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
-			mouseX += (x%8) * MapData.TILE_WIDTH;
+			int areaX = (x + mouseX / MapData.TILE_WIDTH) / 8, areaY = (y + mouseY
+					/ MapData.TILE_HEIGHT) / 8;
+			mouseX += (x % 8) * MapData.TILE_WIDTH;
 			mouseX %= (MapData.TILE_WIDTH * 8);
-			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY += (y % 8) * MapData.TILE_HEIGHT;
 			mouseY %= (MapData.TILE_HEIGHT * 8);
 			map.pushNPCFromCoords(npc, areaX, areaY, mouseX, mouseY);
 		}
-		
+
 		// Doors
 		private MapData.Door getDoorFromMouseXY(int mouseX, int mouseY) {
-			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
-					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
-			mouseX += (x%8) * MapData.TILE_WIDTH;
+			int areaX = (x + mouseX / MapData.TILE_WIDTH) / 8, areaY = (y + mouseY
+					/ MapData.TILE_HEIGHT) / 8;
+			mouseX += (x % 8) * MapData.TILE_WIDTH;
 			mouseX %= (MapData.TILE_WIDTH * 8);
-			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY += (y % 8) * MapData.TILE_HEIGHT;
 			mouseY %= (MapData.TILE_HEIGHT * 8);
-			return map.getDoorFromCoords(areaX, areaY, mouseX/8, mouseY/8);
+			return map.getDoorFromCoords(areaX, areaY, mouseX / 8, mouseY / 8);
 		}
-		
+
 		private MapData.Door popDoorFromMouseXY(int mouseX, int mouseY) {
-			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
-					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
-			mouseX += (x%8) * MapData.TILE_WIDTH;
+			int areaX = (x + mouseX / MapData.TILE_WIDTH) / 8, areaY = (y + mouseY
+					/ MapData.TILE_HEIGHT) / 8;
+			mouseX += (x % 8) * MapData.TILE_WIDTH;
 			mouseX %= (MapData.TILE_WIDTH * 8);
-			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY += (y % 8) * MapData.TILE_HEIGHT;
 			mouseY %= (MapData.TILE_HEIGHT * 8);
-			return map.popDoorFromCoords(areaX, areaY, mouseX/8, mouseY/8);
+			return map.popDoorFromCoords(areaX, areaY, mouseX / 8, mouseY / 8);
 		}
-		
-		private void pushDoorFromMouseXY(MapData.Door door, int mouseX, int mouseY) {
-			int areaX = (x + mouseX/MapData.TILE_WIDTH)/8,
-					areaY = (y + mouseY/MapData.TILE_HEIGHT)/8;
-			mouseX += (x%8) * MapData.TILE_WIDTH;
+
+		private void pushDoorFromMouseXY(MapData.Door door, int mouseX,
+				int mouseY) {
+			int areaX = (x + mouseX / MapData.TILE_WIDTH) / 8, areaY = (y + mouseY
+					/ MapData.TILE_HEIGHT) / 8;
+			mouseX += (x % 8) * MapData.TILE_WIDTH;
 			mouseX %= (MapData.TILE_WIDTH * 8);
-			mouseY += (y%8) * MapData.TILE_HEIGHT;
+			mouseY += (y % 8) * MapData.TILE_HEIGHT;
 			mouseY %= (MapData.TILE_HEIGHT * 8);
 			door.x = mouseX / 8;
 			door.y = mouseY / 8;
 			map.pushDoorFromCoords(door, areaX, areaY);
 		}
-		
+
+		private static final Cursor blankCursor = Toolkit.getDefaultToolkit()
+				.createCustomCursor(
+						new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB),
+						new Point(0, 0), "blank cursor");
+
 		public void mousePressed(MouseEvent e) {
 			int mx = e.getX(), my = e.getY();
-			if (e.getButton() == 1) {
+			if (e.isControlDown() && (e.getButton() == MouseEvent.BUTTON1)) {
+				if (togglePreviousMode == -1) {
+					togglePreviousMode = previousMode;
+					changeMode(9);
+
+					tvPreview = true;
+					tvPreviewX = e.getX();
+					tvPreviewY = e.getY();
+
+					tvPreviewH = 224 / 2;
+					if (prefs.getValueAsBoolean("maskOverscan")) {
+						tvPreviewW = 240 / 2;
+					} else {
+						tvPreviewW = 256 / 2;
+					}
+
+					this.setCursor(blankCursor);
+					repaint();
+				}
+			} else if (e.getButton() == MouseEvent.BUTTON1) {
 				if (editSprites && (movingNPC == -1)) {
 					movingNPC = popNpcIdFromMouseXY(mx, my);
 					if (movingNPC != -1) {
 						MapData.NPC tmp = map.getNPC(movingNPC);
-						movingNPCimg = map.getSpriteImage(tmp.sprite, tmp.direction);
+						movingNPCimg = map.getSpriteImage(tmp.sprite,
+								tmp.direction);
 						movingNPCdim = map.getSpriteWH(tmp.sprite);
-						movingDrawX = mx - movingNPCdim[0]/2 + 1;
+						movingDrawX = mx - movingNPCdim[0] / 2 + 1;
 						movingDrawY = my - movingNPCdim[1] + 9;
 						repaint();
 					}
 				} else if (editDoors && (movingDoor == null)) {
 					movingDoor = popDoorFromMouseXY(mx, my);
 					if (movingDoor != null) {
-						movingDrawX = mx&(~7);
-						movingDrawY = my&(~7);
+						movingDrawX = mx & (~7);
+						movingDrawY = my & (~7);
 						repaint();
 					}
 				}
@@ -1119,7 +1221,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void mouseReleased(MouseEvent e) {
 			int mx = e.getX(), my = e.getY();
 			if (e.getButton() == 1) {
-				if (editSprites && (movingNPC != -1)) {
+				if (togglePreviousMode != -1) {
+					changeMode(togglePreviousMode);
+					togglePreviousMode = -1;
+					this.setCursor(Cursor.getDefaultCursor());
+					tvPreview = false;
+					repaint();
+				} else if (editSprites && (movingNPC != -1)) {
 					pushNpcIdFromMouseXY(movingNPC, mx, my);
 					movingNPC = -1;
 					repaint();
@@ -1134,18 +1242,22 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		@Override
 		public void mouseEntered(MouseEvent e) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		@Override
 		public void mouseExited(MouseEvent e) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		public void mouseDragged(MouseEvent e) {
-			if (movingNPC != -1) {
-				movingDrawX = e.getX() - movingNPCdim[0]/2 + 1;
+			if (tvPreview) {
+				tvPreviewX = e.getX();
+				tvPreviewY = e.getY();
+				repaint();
+			} else if (movingNPC != -1) {
+				movingDrawX = e.getX() - movingNPCdim[0] / 2 + 1;
 				movingDrawY = e.getY() - movingNPCdim[1] + 9;
 				repaint();
 			} else if (movingDoor != null) {
@@ -1274,7 +1386,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				editHotspots = false;
 			}
 		}
-		
+
 		public void seek(DoorEditor de) {
 			changeMode(4);
 			doorSeeker = de;
@@ -1287,18 +1399,18 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		public void toggleSpriteBoxes() {
 			spriteBoxes = !spriteBoxes;
 		}
-		
+
 		public void toggleTileNums() {
 			drawTileNums = !drawTileNums;
 		}
-		
+
 		public void toggleSpriteNums() {
 			drawSpriteNums = !drawSpriteNums;
 		}
 
 		public void toggleMapChanges() {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		public boolean undoMapAction() {
@@ -1308,7 +1420,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					UndoableTileChange tc = (UndoableTileChange) undo;
 					map.setMapTile(tc.x, tc.y, tc.oldTile);
 				} else if (undo instanceof UndoableSectorPaste) {
-					//UndoableSectorPaste usp = (UndoableSectorPaste) undo;
+					// UndoableSectorPaste usp = (UndoableSectorPaste) undo;
 					// TODO
 				}
 				if (undoStack.isEmpty())
@@ -1320,7 +1432,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			} else
 				return false;
 		}
-		
+
 		public boolean redoMapAction() {
 			if (!redoStack.empty()) {
 				Object redo = redoStack.pop();
@@ -1339,16 +1451,17 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			} else
 				return false;
 		}
-		
+
 		public void setScreenSize(int newSW, int newSH) {
 			if ((newSW != screenWidth) || (newSH != screenHeight)) {
 				screenWidth = newSW;
 				screenHeight = newSH;
-				
-				setPreferredSize(new Dimension(
-						screenWidth * MapData.TILE_WIDTH + 2,
-						screenHeight * MapData.TILE_HEIGHT + 2));
-				
+
+				setMapXY(x, y);
+
+				setPreferredSize(new Dimension(screenWidth * MapData.TILE_WIDTH
+						+ 2, screenHeight * MapData.TILE_HEIGHT + 2));
+
 				repaint();
 			}
 		}
@@ -1357,89 +1470,89 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				int sectorY2, int[][] copiedSectorTiles) {
 			for (int i = 0; i < copiedSectorTiles.length; i++)
 				for (int j = 0; j < copiedSectorTiles[i].length; j++) {
-					map.setMapTile(sectorX * 8 + j,
-							sectorY * 4 + i,
+					map.setMapTile(sectorX * 8 + j, sectorY * 4 + i,
 							copiedSectorTiles[i][j]);
 				}
 			map.getSector(sectorX, sectorY).copy(copiedSector);
 			// TODO
-			//undoStack.push(new UndoableSectorPaste(sectorX, sectorY, copiedSectorTiles, copiedSector));
+			// undoStack.push(new UndoableSectorPaste(sectorX, sectorY,
+			// copiedSectorTiles, copiedSector));
 		}
 	}
-	
-    private class TileSelector extends AbstractButton implements MouseListener, AdjustmentListener {
-    	private int width, height;
-    	private int tile = 0, mode = 0;
-    	private JScrollBar scroll;
-    	
-    	public TileSelector(int width, int height) {
-    		super();
-    		
-    		this.width = width;
-    		this.height = height;
-    		
-			scroll = new JScrollBar(JScrollBar.HORIZONTAL, 0, width, 0, (1024/height) + (1024%height > 0 ? 1 : 0));
+
+	private class TileSelector extends AbstractButton implements MouseListener,
+			AdjustmentListener {
+		private int width, height;
+		private int tile = 0, mode = 0;
+		private JScrollBar scroll;
+
+		public TileSelector(int width, int height) {
+			super();
+
+			this.width = width;
+			this.height = height;
+
+			scroll = new JScrollBar(JScrollBar.HORIZONTAL, 0, width, 0,
+					(1024 / height) + (1024 % height > 0 ? 1 : 0));
 			scroll.addAdjustmentListener(this);
-			
-			setPreferredSize(new Dimension(
-					width * MapData.TILE_WIDTH + 3,
+
+			setPreferredSize(new Dimension(width * MapData.TILE_WIDTH + 3,
 					height * MapData.TILE_HEIGHT + 3));
-			
+
 			changeMode(0);
-			
+
 			this.addMouseListener(this);
-    	}
-    	
-    	public void setScreenSize(int newSW) {
+		}
+
+		public void setScreenSize(int newSW) {
 			if (newSW != width) {
 				width = newSW;
-				
-				setPreferredSize(new Dimension(
-						width * MapData.TILE_WIDTH + 3,
+
+				setPreferredSize(new Dimension(width * MapData.TILE_WIDTH + 3,
 						height * MapData.TILE_HEIGHT + 3));
 				scroll.setVisibleAmount(width);
 				if (scroll.getValue() + width + 1 > scroll.getMaximum()) {
 					scroll.setValue(scroll.getMaximum() - width - 1);
-					
+
 				}
-				
+
 				repaint();
 			}
-    	}
-    	
-    	public void changeMode(int mode) {
-    		this.mode = mode;
-    		tile = 0;
+		}
+
+		public void changeMode(int mode) {
+			this.mode = mode;
+			tile = 0;
 			if (mode == 7) {
 				scroll.setEnabled(true);
 				scroll.setMaximum(203 / (height) + 1);
 				tile = Math.min(202, tile);
-			}else if (mode == 0) {
+			} else if (mode == 0) {
 				scroll.setEnabled(true);
 				scroll.setMaximum(1024 / (height) + 1);
 			} else {
 				scroll.setEnabled(false);
 				scroll.setMaximum(0);
 			}
-    	}
-    	
-    	public void selectTile(int tile) {
-    		this.tile = tile;
-    		if ((tile < scroll.getValue() * height)
-    				|| (tile > (scroll.getValue()+width+1) * height))
-    			scroll.setValue(tile/height);
-    		else
-    			repaint();
-    	}
-    	
-    	public int getSelectedTile() {
-            return tile;
-        }
-    	
-    	public JScrollBar getScrollBar() {
-    		return scroll;
-    	}
-    	
+		}
+
+		public void selectTile(int tile) {
+			this.tile = tile;
+			if ((tile < scroll.getValue() * height)
+					|| (tile > (scroll.getValue() + width + 1) * height))
+				scroll.setValue(tile / height);
+			else
+				repaint();
+		}
+
+		public int getSelectedTile() {
+			return tile;
+		}
+
+		public JScrollBar getScrollBar() {
+			return scroll;
+		}
+
 		public void paintComponent(Graphics g) {
 			super.paintComponent(g);
 			Graphics2D g2d = (Graphics2D) g;
@@ -1454,138 +1567,155 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				scroll.setEnabled(false);
 			}
 		}
-		
+
 		private void drawEnemies(Graphics2D g) {
 			int dtile;
 			String message;
 			Rectangle2D rect;
 			for (int i = 0; i < width; i++) {
 				for (int j = 0; j < height; j++) {
-					dtile = (i+scroll.getValue())*height+j;
+					dtile = (i + scroll.getValue()) * height + j;
 					if (dtile < 203) {
 						g.setPaint(MapDisplay.enemyColors[dtile]);
-						g.fill(new Rectangle2D.Double(
-								i * MapData.TILE_WIDTH + 1,
-								j * MapData.TILE_HEIGHT + 1,
+						g.fill(new Rectangle2D.Double(i * MapData.TILE_WIDTH
+								+ 1, j * MapData.TILE_HEIGHT + 1,
 								MapData.TILE_WIDTH, MapData.TILE_HEIGHT));
-						
+
 						g.setPaint(Color.black);
 						message = addZeros(Integer.toString(dtile), 3);
 						rect = g.getFontMetrics().getStringBounds(message, g);
-						rect.setRect(
-								i * MapData.TILE_WIDTH + 1,
-								j * MapData.TILE_HEIGHT + 1,
-								rect.getWidth(), rect.getHeight());
+						rect.setRect(i * MapData.TILE_WIDTH + 1, j
+								* MapData.TILE_HEIGHT + 1, rect.getWidth(),
+								rect.getHeight());
 						g.fill(rect);
 						g.setPaint(Color.white);
 						g.drawString(message,
 								(float) (i * MapData.TILE_WIDTH + 1),
-								(float) (j * MapData.TILE_HEIGHT + rect.getHeight()));
+								(float) (j * MapData.TILE_HEIGHT + rect
+										.getHeight()));
 						if (dtile == tile) {
 							g.setPaint(Color.yellow);
-							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
-							g.fillRect(i*MapData.TILE_WIDTH + 1, j*MapData.TILE_HEIGHT + 1,
+							g.setComposite(AlphaComposite.getInstance(
+									AlphaComposite.SRC_OVER, 0.6F));
+							g.fillRect(i * MapData.TILE_WIDTH + 1, j
+									* MapData.TILE_HEIGHT + 1,
 									MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
-							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
+							g.setComposite(AlphaComposite.getInstance(
+									AlphaComposite.SRC_OVER, 1.0F));
 						}
 					}
 				}
 			}
 		}
-		
+
 		private void drawTiles(Graphics2D g) {
 			int dtile;
 			for (int i = 0; i < width; i++) {
 				for (int j = 0; j < height; j++) {
-					dtile = (i+scroll.getValue())*height+j;
+					dtile = (i + scroll.getValue()) * height + j;
 					if (dtile < 1024) {
-						g.drawImage(
-								MapDisplay.getTileImage(
-										TileEditor.getDrawTilesetNumber(tilesetChooser.getSelectedIndex()),
-										dtile,
-										mapDisplay.getSelectedSectorPalNumber()),
-								i*MapData.TILE_WIDTH + 1, j*MapData.TILE_HEIGHT + 1,
-								MapData.TILE_WIDTH, MapData.TILE_HEIGHT,
-								this);
+						g.drawImage(MapDisplay.getTileImage(TileEditor
+								.getDrawTilesetNumber(tilesetChooser
+										.getSelectedIndex()), dtile, mapDisplay
+								.getSelectedSectorPalNumber()), i
+								* MapData.TILE_WIDTH + 1, j
+								* MapData.TILE_HEIGHT + 1, MapData.TILE_WIDTH,
+								MapData.TILE_HEIGHT, this);
 						if (dtile == tile) {
 							g.setPaint(Color.yellow);
-							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
-							g.fillRect(i*MapData.TILE_WIDTH + 1, j*MapData.TILE_HEIGHT + 1,
+							g.setComposite(AlphaComposite.getInstance(
+									AlphaComposite.SRC_OVER, 0.6F));
+							g.fillRect(i * MapData.TILE_WIDTH + 1, j
+									* MapData.TILE_HEIGHT + 1,
 									MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
-							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
+							g.setComposite(AlphaComposite.getInstance(
+									AlphaComposite.SRC_OVER, 1.0F));
 						}
 					}
 				}
 			}
 		}
-		
+
 		private void drawGrid(Graphics2D g) {
 			g.setPaint(Color.black);
 			// Draw vertical lines
-			for (int i = 0; i < width+1; i++)
-				g.drawLine(1 + i * MapData.TILE_WIDTH, 1, 1 + i * MapData.TILE_WIDTH, height * MapData.TILE_HEIGHT);
+			for (int i = 0; i < width + 1; i++)
+				g.drawLine(1 + i * MapData.TILE_WIDTH, 1, 1 + i
+						* MapData.TILE_WIDTH, height * MapData.TILE_HEIGHT);
 			// Draw horizontal lines
-			for (int i = 0; i < height+1; i++)
-				g.drawLine(1, 1 + i * MapData.TILE_HEIGHT, width * MapData.TILE_WIDTH, 1 + i * MapData.TILE_HEIGHT);
-			
+			for (int i = 0; i < height + 1; i++)
+				g.drawLine(1, 1 + i * MapData.TILE_HEIGHT, width
+						* MapData.TILE_WIDTH, 1 + i * MapData.TILE_HEIGHT);
+
 			// Blank pixel in the bottom right corner
-			g.drawLine(width * MapData.TILE_WIDTH + 1,
-					height * MapData.TILE_HEIGHT + 1,
-					width * MapData.TILE_WIDTH + 1,
+			g.drawLine(width * MapData.TILE_WIDTH + 1, height
+					* MapData.TILE_HEIGHT + 1, width * MapData.TILE_WIDTH + 1,
 					height * MapData.TILE_HEIGHT + 1);
-			
+
 			// Draw border
 			g.setColor(Color.black);
-			g.draw(new Rectangle2D.Double(0, 0,
-					width * MapData.TILE_WIDTH + 2,
+			g.draw(new Rectangle2D.Double(0, 0, width * MapData.TILE_WIDTH + 2,
 					height * MapData.TILE_HEIGHT + 2));
 		}
-		
+
 		public void adjustmentValueChanged(AdjustmentEvent e) {
 			repaint();
 		}
 
 		public void mouseClicked(MouseEvent e) {
 			if ((e.getButton() == MouseEvent.BUTTON1) && isEnabled()) {
-				tile = (((e.getX()-1) / MapData.TILE_WIDTH) + scroll.getValue()) * height
-							+ ((e.getY()-1) / MapData.TILE_HEIGHT);
+				tile = (((e.getX() - 1) / MapData.TILE_WIDTH) + scroll
+						.getValue())
+						* height
+						+ ((e.getY() - 1) / MapData.TILE_HEIGHT);
 				if (mode == 0)
 					tile = Math.min(tile, 1023);
 				else if (mode == 7)
 					tile = Math.min(tile, 202);
 				repaint();
 				if (e.isShiftDown()) {
-					ebhack.Ebhack.main.showModule(
-							TileEditor.class, new int[] { 
-								TileEditor.getDrawTilesetNumber(tilesetChooser.getSelectedIndex()),
-								mapDisplay.getSelectedSectorPalNumber(),
-								tile });
+					ebhack.Ebhack.main
+							.showModule(
+									TileEditor.class,
+									new int[] {
+											TileEditor
+													.getDrawTilesetNumber(tilesetChooser
+															.getSelectedIndex()),
+											mapDisplay
+													.getSelectedSectorPalNumber(),
+											tile });
 				}
 			}
 		}
 
-		public void mousePressed(MouseEvent e) { }
+		public void mousePressed(MouseEvent e) {
+		}
 
-		public void mouseReleased(MouseEvent e) { }
+		public void mouseReleased(MouseEvent e) {
+		}
 
-		public void mouseEntered(MouseEvent e) { }
+		public void mouseEntered(MouseEvent e) {
+		}
 
-		public void mouseExited(MouseEvent e) { }
-    }
-	
+		public void mouseExited(MouseEvent e) {
+		}
+	}
+
 	public static class MapData {
-		public static final int WIDTH_IN_TILES = 32*8;
-		public static final int HEIGHT_IN_TILES = 80*4;
+		public static final int WIDTH_IN_TILES = 32 * 8;
+		public static final int HEIGHT_IN_TILES = 80 * 4;
 		public static final int SECTOR_WIDTH = 8;
 		public static final int SECTOR_HEIGHT = 4;
-		public static final int WIDTH_IN_SECTORS = WIDTH_IN_TILES/SECTOR_WIDTH;
-		public static final int HEIGHT_IN_SECTORS = HEIGHT_IN_TILES/SECTOR_HEIGHT;
+		public static final int WIDTH_IN_SECTORS = WIDTH_IN_TILES
+				/ SECTOR_WIDTH;
+		public static final int HEIGHT_IN_SECTORS = HEIGHT_IN_TILES
+				/ SECTOR_HEIGHT;
 		public static final int TILE_WIDTH = 32;
 		public static final int TILE_HEIGHT = 32;
-		
+
 		public static final int NUM_MAP_TSETS = 32;
 		public static final int NUM_DRAW_TSETS = 20;
-		
+
 		// Stores the map tiles
 		private int[][] mapTiles;
 		private Sector[][] sectors;
@@ -1595,8 +1725,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		private static Image[][] spriteGroups;
 		private static int[][] spriteGroupDims;
 		private int[][] enemyPlacement;
-		private Hotspot[] hotspots; 
-		
+		private Hotspot[] hotspots;
+
 		public MapData() {
 			reset();
 		}
@@ -1607,193 +1737,208 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			for (int i = 0; i < sectors.length; ++i)
 				for (int j = 0; j < sectors[i].length; ++j)
 					sectors[i][j] = new Sector();
-			spriteAreas = new ArrayList[HEIGHT_IN_SECTORS/2][WIDTH_IN_SECTORS];
+			spriteAreas = new ArrayList[HEIGHT_IN_SECTORS / 2][WIDTH_IN_SECTORS];
 			for (int i = 0; i < spriteAreas.length; ++i)
 				for (int j = 0; j < spriteAreas[i].length; ++j)
 					spriteAreas[i][j] = new ArrayList<SpriteEntry>();
-			doorAreas = new ArrayList[HEIGHT_IN_SECTORS/2][WIDTH_IN_SECTORS];
+			doorAreas = new ArrayList[HEIGHT_IN_SECTORS / 2][WIDTH_IN_SECTORS];
 			for (int i = 0; i < doorAreas.length; ++i)
 				for (int j = 0; j < doorAreas[i].length; ++j)
 					doorAreas[i][j] = new ArrayList<Door>();
 			npcs = new NPC[1584];
 			spriteGroups = new Image[464][4];
 			spriteGroupDims = new int[464][2];
-			enemyPlacement = new int[HEIGHT_IN_TILES/2][WIDTH_IN_TILES/2];
+			enemyPlacement = new int[HEIGHT_IN_TILES / 2][WIDTH_IN_TILES / 2];
 			hotspots = new Hotspot[56];
 			for (int i = 0; i < hotspots.length; ++i)
 				hotspots[i] = new Hotspot();
 		}
-		
+
 		public void load(Project proj) {
-			importMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
-			importSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
-			importSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
+			importMapTiles(new File(proj.getFilename("eb.MapModule",
+					"map_tiles")));
+			importSectors(new File(proj.getFilename("eb.MapModule",
+					"map_sectors")));
+			importSpritePlacements(new File(proj.getFilename(
+					"eb.MapSpriteModule", "map_sprites")));
 			importDoors(new File(proj.getFilename("eb.DoorModule", "map_doors")));
-			importEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
-			importHotspots(new File(proj.getFilename("eb.MiscTablesModule", "map_hotspots")));
-			
+			importEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule",
+					"map_enemy_placement")));
+			importHotspots(new File(proj.getFilename("eb.MiscTablesModule",
+					"map_hotspots")));
+
 			loadExtraResources(proj);
 		}
-		
+
 		public void loadExtraResources(Project proj) {
-			importNPCs(new File(proj.getFilename("eb.MiscTablesModule", "npc_config_table")));
+			importNPCs(new File(proj.getFilename("eb.MiscTablesModule",
+					"npc_config_table")));
 			importSpriteGroups(proj);
 		}
-		
+
 		public void save(Project proj) {
-			exportMapTiles(new File(proj.getFilename("eb.MapModule", "map_tiles")));
-			exportSectors(new File(proj.getFilename("eb.MapModule", "map_sectors")));
-			exportSpritePlacements(new File(proj.getFilename("eb.MapSpriteModule", "map_sprites")));
+			exportMapTiles(new File(proj.getFilename("eb.MapModule",
+					"map_tiles")));
+			exportSectors(new File(proj.getFilename("eb.MapModule",
+					"map_sectors")));
+			exportSpritePlacements(new File(proj.getFilename(
+					"eb.MapSpriteModule", "map_sprites")));
 			exportDoors(new File(proj.getFilename("eb.DoorModule", "map_doors")));
-			exportEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule", "map_enemy_placement")));
-			exportHotspots(new File(proj.getFilename("eb.MiscTablesModule", "map_hotspots")));
+			exportEnemyPlacement(new File(proj.getFilename("eb.MapEnemyModule",
+					"map_enemy_placement")));
+			exportHotspots(new File(proj.getFilename("eb.MiscTablesModule",
+					"map_hotspots")));
 		}
-		
+
 		public NPC getNPC(int n) {
 			return npcs[n];
 		}
-		
+
 		public int[] getSpriteWH(int n) {
 			return spriteGroupDims[n];
 		}
-		
+
 		// Sprite Editing
-		
-		public SpriteEntry getSpriteEntryFromCoords(int areaX, int areaY, int x, int y) {
+
+		public SpriteEntry getSpriteEntryFromCoords(int areaX, int areaY,
+				int x, int y) {
 			int[] wh;
 			NPC npc;
 			for (SpriteEntry e : spriteAreas[areaY][areaX]) {
 				npc = npcs[e.npcID];
 				wh = spriteGroupDims[npc.sprite];
-				if ((e.x >= x - wh[0]/2) && (e.x <= x + wh[0]/2)
-						&& (e.y >= y - wh[1]/2) && (e.y <= y + wh[1]/2)) {
+				if ((e.x >= x - wh[0] / 2) && (e.x <= x + wh[0] / 2)
+						&& (e.y >= y - wh[1] / 2) && (e.y <= y + wh[1] / 2)) {
 					return e;
 				}
 			}
 			return null;
 		}
-		
+
 		public int popNPCFromCoords(int areaX, int areaY, int x, int y) {
 			int[] wh;
 			NPC npc;
 			for (SpriteEntry e : spriteAreas[areaY][areaX]) {
 				npc = npcs[e.npcID];
 				wh = spriteGroupDims[npc.sprite];
-				if ((e.x >= x - wh[0]/2) && (e.x <= x + wh[0]/2)
-						&& (e.y >= y - wh[1]/2) && (e.y <= y + wh[1]/2)) {
+				if ((e.x >= x - wh[0] / 2) && (e.x <= x + wh[0] / 2)
+						&& (e.y >= y - wh[1] / 2) && (e.y <= y + wh[1] / 2)) {
 					spriteAreas[areaY][areaX].remove(e);
 					return e.npcID;
 				}
 			}
 			return -1;
 		}
-		
-		public void pushNPCFromCoords(int npcid, int areaX, int areaY, int x, int y) {
+
+		public void pushNPCFromCoords(int npcid, int areaX, int areaY, int x,
+				int y) {
 			if ((areaX >= 0) && (areaY >= 0))
 				spriteAreas[areaY][areaX].add(new SpriteEntry(x, y, npcid));
 		}
-		
+
 		public List<SpriteEntry> getSpriteArea(int areaX, int areaY) {
 			return spriteAreas[areaY][areaX];
 		}
-		
+
 		// Door Editing
 
 		public List<Door> getDoorArea(int areaX, int areaY) {
 			return doorAreas[areaY][areaX];
 		}
-		
+
 		public Door getDoorFromCoords(int areaX, int areaY, int x, int y) {
 			for (Door e : doorAreas[areaY][areaX]) {
-				if ((x <= e.x + 1) && (x >= e.x)
-						&& (y <= e.y + 1) && (y >= e.y)) {
+				if ((x <= e.x + 1) && (x >= e.x) && (y <= e.y + 1)
+						&& (y >= e.y)) {
 					return e;
 				}
 			}
 			return null;
 		}
-		
+
 		public Door popDoorFromCoords(int areaX, int areaY, int x, int y) {
 			for (Door e : doorAreas[areaY][areaX]) {
-				if ((x <= e.x + 1) && (x >= e.x)
-						&& (y <= e.y + 1) && (y >= e.y)) {
+				if ((x <= e.x + 1) && (x >= e.x) && (y <= e.y + 1)
+						&& (y >= e.y)) {
 					doorAreas[areaY][areaX].remove(e);
 					return e;
 				}
 			}
 			return null;
 		}
-		
+
 		public void pushDoorFromCoords(Door door, int areaX, int areaY) {
 			if ((areaX >= 0) && (areaY >= 0))
 				doorAreas[areaY][areaX].add(door);
 		}
-		
+
 		// Enemy Editing
-		
+
 		public int getMapEnemyGroup(int x, int y) {
 			return enemyPlacement[y][x];
 		}
-		
+
 		public void setMapEnemyGroup(int x, int y, int val) {
 			enemyPlacement[y][x] = val;
 		}
-		
+
 		// Hotspot
-		
+
 		public int numHotspots() {
 			return 56;
 		}
-		
+
 		public Hotspot getHotspot(int n) {
 			return hotspots[n];
 		}
-		
+
 		// Other
-		
+
 		public Sector getSector(int sectorX, int sectorY) {
 			return sectors[sectorY][sectorX];
 		}
-		
+
 		public Image getSpriteImage(int sprite, int direction) {
 			return spriteGroups[sprite][direction];
 		}
-		
+
 		private void importMapTiles(File f) {
-	        if (f == null)
-	            return;
-	        
+			if (f == null)
+				return;
+
 			try {
 				FileInputStream in = new FileInputStream(f);
-		        setMapTilesFromStream(in);
+				setMapTilesFromStream(in);
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void exportMapTiles(File f) {
-	        if (f == null)
-	            return;
-	        
+			if (f == null)
+				return;
+
 			try {
 				FileOutputStream out = new FileOutputStream(f);
-		        writeMapTilesToStream(out);
+				writeMapTilesToStream(out);
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void importNPCs(File f) {
 			InputStream input;
 			try {
 				input = new FileInputStream(f);
 				Yaml yaml = new Yaml();
-				Map<Integer, Map<String, Object>> sectorsMap = (Map<Integer, Map<String, Object>>) yaml.load(input);
-				
+				Map<Integer, Map<String, Object>> sectorsMap = (Map<Integer, Map<String, Object>>) yaml
+						.load(input);
+
 				NPC npc;
-				for (Map.Entry<Integer, Map<String, Object>> entry: sectorsMap.entrySet()) {
+				for (Map.Entry<Integer, Map<String, Object>> entry : sectorsMap
+						.entrySet()) {
 					npc = new NPC((Integer) entry.getValue().get("Sprite"),
 							(String) entry.getValue().get("Direction"));
 					npcs[entry.getKey()] = npc;
@@ -1803,27 +1948,31 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void importSpriteGroups(Project proj) {
 			int w, h, x, y, z;
 			for (int i = 0; i < spriteGroups.length; ++i) {
 				spriteGroups[i] = new Image[4];
 				try {
-					BufferedImage sheet = ImageIO.read(new File(proj.getFilename(
-							"eb.SpriteGroupModule",
-							"SpriteGroups/" + ToolModule.addZeros(i+"", 3))));
+					BufferedImage sheet = ImageIO.read(new File(proj
+							.getFilename(
+									"eb.SpriteGroupModule",
+									"SpriteGroups/"
+											+ ToolModule.addZeros(i + "", 3))));
 					Graphics2D sg = sheet.createGraphics();
-					
-					w = sheet.getWidth()/4;
-					h = sheet.getHeight()/4;
+
+					w = sheet.getWidth() / 4;
+					h = sheet.getHeight() / 4;
 					spriteGroupDims[i] = new int[] { w, h };
 					z = 0;
-					for (y=0; y<2; ++y) {
-						for (x=0; x<4; x += 2) {
-							BufferedImage sp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+					for (y = 0; y < 2; ++y) {
+						for (x = 0; x < 4; x += 2) {
+							BufferedImage sp = new BufferedImage(w, h,
+									BufferedImage.TYPE_INT_ARGB);
 							Graphics2D g = sp.createGraphics();
 							g.setComposite(sg.getComposite());
-							g.drawImage(sheet, 0, 0, w, h, w*x, h*y, w*x+w, h*y+h, null);
+							g.drawImage(sheet, 0, 0, w, h, w * x, h * y, w * x
+									+ w, h * y + h, null);
 							g.dispose();
 							spriteGroups[i][z] = sp;
 							++z;
@@ -1835,7 +1984,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				}
 			}
 		}
-		
+
 		public static class Door {
 			public int x, y, eventFlag;
 			public String type, pointer;
@@ -1843,15 +1992,18 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			public int climbDir;
 			// Door stuff
 			public int destX, destY, destDir, style;
-			
+
 			public Door() {
 				this.type = "ladder";
 				this.pointer = "$0";
 			}
+
 			public Door(int x, int y, String type) {
-				this.x = x; this.y = y; this.type = type;
+				this.x = x;
+				this.y = y;
+				this.type = type;
 			}
-			
+
 			public Door copy() {
 				Door d = new Door();
 				d.eventFlag = eventFlag;
@@ -1865,10 +2017,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				return d;
 			}
 		}
-		
-		private final String[] climbDirs = new String[] { "nw", "ne", "sw", "se", "nowhere" };
-		private final String[] destDirs = new String[] {"down", "up", "right", "left"};
-		
+
+		private final String[] climbDirs = new String[] { "nw", "ne", "sw",
+				"se", "nowhere" };
+		private final String[] destDirs = new String[] { "down", "up", "right",
+				"left" };
+
 		private int indexOf(Object[] arr, Object target) {
 			int i = 0;
 			for (Object e : arr) {
@@ -1878,41 +2032,49 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 			return -1;
 		}
-		
+
 		private void importDoors(File f) {
 			InputStream input;
 			try {
 				input = new FileInputStream(f);
 				Yaml yaml = new Yaml();
-				Map<Integer, Map<Integer, List<Map<String, Object>>>> doorsMap =
-						(Map<Integer, Map<Integer, List<Map<String, Object>>>>) yaml.load(input);
+				Map<Integer, Map<Integer, List<Map<String, Object>>>> doorsMap = (Map<Integer, Map<Integer, List<Map<String, Object>>>>) yaml
+						.load(input);
 				int y, x;
 				ArrayList<Door> area;
-				for (Map.Entry<Integer, Map<Integer, List<Map<String, Object>>>> rowEntry: doorsMap.entrySet()) {
+				for (Map.Entry<Integer, Map<Integer, List<Map<String, Object>>>> rowEntry : doorsMap
+						.entrySet()) {
 					y = rowEntry.getKey();
-					for (Map.Entry<Integer, List<Map<String, Object>>> entry: rowEntry.getValue().entrySet()) {
+					for (Map.Entry<Integer, List<Map<String, Object>>> entry : rowEntry
+							.getValue().entrySet()) {
 						x = entry.getKey();
 						area = this.doorAreas[y][x];
 						area.clear();
 						if (entry.getValue() == null)
 							continue;
-						
+
 						for (Map<String, Object> de : entry.getValue()) {
-							Door d = new Door((Integer) de.get("X"), (Integer) de.get("Y"),
+							Door d = new Door((Integer) de.get("X"),
+									(Integer) de.get("Y"),
 									((String) de.get("Type")).toLowerCase());
-							if (d.type.equals("stairs") || d.type.equals("escalator")) {
-								d.climbDir = indexOf(climbDirs, de.get("Direction"));
+							if (d.type.equals("stairs")
+									|| d.type.equals("escalator")) {
+								d.climbDir = indexOf(climbDirs,
+										de.get("Direction"));
 							} else if (d.type.equals("door")) {
 								d.pointer = (String) de.get("Text Pointer");
 								d.eventFlag = (Integer) de.get("Event Flag");
 								d.destX = (Integer) de.get("Destination X");
 								d.destY = (Integer) de.get("Destination Y");
-								d.destDir = indexOf(destDirs, ((String) de.get("Direction")).toLowerCase());
+								d.destDir = indexOf(destDirs,
+										((String) de.get("Direction"))
+												.toLowerCase());
 								d.style = (Integer) de.get("Style");
 							} else if (d.type.equals("switch")) {
 								d.pointer = (String) de.get("Text Pointer");
 								d.eventFlag = (Integer) de.get("Event Flag");
-							} else if (d.type.equals("person") || d.type.equals("object")) {
+							} else if (d.type.equals("person")
+									|| d.type.equals("object")) {
 								d.pointer = (String) de.get("Text Pointer");
 							}
 							area.add(d);
@@ -1924,28 +2086,25 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void exportDoors(File f) {
-			Map<Integer, Map<Integer, List<Map<String, Object>>>> doorsMap =
-					new HashMap<Integer, Map<Integer, List<Map<String, Object>>>>();
+			Map<Integer, Map<Integer, List<Map<String, Object>>>> doorsMap = new HashMap<Integer, Map<Integer, List<Map<String, Object>>>>();
 			int x, y = 0;
 			for (List<Door>[] row : doorAreas) {
-				Map<Integer, List<Map<String, Object>>> rowOut =
-						new HashMap<Integer, List<Map<String, Object>>>();
+				Map<Integer, List<Map<String, Object>>> rowOut = new HashMap<Integer, List<Map<String, Object>>>();
 				x = 0;
 				for (List<Door> area : row) {
 					if (area.isEmpty())
 						rowOut.put(x, null);
 					else {
-						List<Map<String, Object>> areaOut =
-								new ArrayList<Map<String, Object>>();
+						List<Map<String, Object>> areaOut = new ArrayList<Map<String, Object>>();
 						for (Door d : area) {
-							Map<String, Object> dOut =
-									new HashMap<String, Object>();
+							Map<String, Object> dOut = new HashMap<String, Object>();
 							dOut.put("X", d.x);
 							dOut.put("Y", d.y);
 							dOut.put("Type", d.type);
-							if (d.type.equals("stairway") || d.type.equals("escalator")) {
+							if (d.type.equals("stairway")
+									|| d.type.equals("escalator")) {
 								dOut.put("Direction", climbDirs[d.climbDir]);
 							} else if (d.type.equals("door")) {
 								dOut.put("Text Pointer", d.pointer);
@@ -1957,7 +2116,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 							} else if (d.type.equals("switch")) {
 								dOut.put("Text Pointer", d.pointer);
 								dOut.put("Event Flag", d.eventFlag);
-							} else if (d.type.equals("person") || d.type.equals("object")) {
+							} else if (d.type.equals("person")
+									|| d.type.equals("object")) {
 								dOut.put("Text Pointer", d.pointer);
 							}
 							areaOut.add(dOut);
@@ -1969,40 +2129,42 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				doorsMap.put(y, rowOut);
 				++y;
 			}
-			
+
 			try {
 				FileWriter fw = new FileWriter(f);
 				DumperOptions options = new DumperOptions();
-			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-			    Yaml yaml = new Yaml(options);
-	        	yaml.dump(doorsMap, fw);
+				options.setDefaultFlowStyle(FlowStyle.BLOCK);
+				Yaml yaml = new Yaml(options);
+				yaml.dump(doorsMap, fw);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void importSpritePlacements(File f) {
 			InputStream input;
 			try {
 				input = new FileInputStream(f);
 				Yaml yaml = new Yaml();
-				Map<Integer, Map<Integer, List<Map<String, Integer>>>> spritesMap =
-						(Map<Integer, Map<Integer, List<Map<String, Integer>>>>) yaml.load(input);
+				Map<Integer, Map<Integer, List<Map<String, Integer>>>> spritesMap = (Map<Integer, Map<Integer, List<Map<String, Integer>>>>) yaml
+						.load(input);
 				int y, x;
 				ArrayList<SpriteEntry> area;
-				for (Map.Entry<Integer, Map<Integer, List<Map<String, Integer>>>> rowEntry: spritesMap.entrySet()) {
+				for (Map.Entry<Integer, Map<Integer, List<Map<String, Integer>>>> rowEntry : spritesMap
+						.entrySet()) {
 					y = rowEntry.getKey();
-					for (Map.Entry<Integer, List<Map<String, Integer>>> entry: rowEntry.getValue().entrySet()) {
+					for (Map.Entry<Integer, List<Map<String, Integer>>> entry : rowEntry
+							.getValue().entrySet()) {
 						x = entry.getKey();
 						area = this.spriteAreas[y][x];
 						area.clear();
 						if (entry.getValue() == null)
 							continue;
-						
+
 						for (Map<String, Integer> spe : entry.getValue()) {
-							area.add(new SpriteEntry(
-									spe.get("X"), spe.get("Y"), spe.get("NPC ID")));
+							area.add(new SpriteEntry(spe.get("X"),
+									spe.get("Y"), spe.get("NPC ID")));
 						}
 					}
 				}
@@ -2011,24 +2173,20 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void exportSpritePlacements(File f) {
-			Map<Integer, Map<Integer, List<Map<String, Integer>>>> spritesMap =
-					new HashMap<Integer, Map<Integer, List<Map<String, Integer>>>>();
+			Map<Integer, Map<Integer, List<Map<String, Integer>>>> spritesMap = new HashMap<Integer, Map<Integer, List<Map<String, Integer>>>>();
 			int x, y = 0;
 			for (List<SpriteEntry>[] row : spriteAreas) {
-				Map<Integer, List<Map<String, Integer>>> rowOut =
-						new HashMap<Integer, List<Map<String, Integer>>>();
+				Map<Integer, List<Map<String, Integer>>> rowOut = new HashMap<Integer, List<Map<String, Integer>>>();
 				x = 0;
 				for (List<SpriteEntry> area : row) {
 					if (area.isEmpty())
 						rowOut.put(x, null);
 					else {
-						List<Map<String, Integer>> areaOut =
-								new ArrayList<Map<String, Integer>>();
+						List<Map<String, Integer>> areaOut = new ArrayList<Map<String, Integer>>();
 						for (SpriteEntry se : area) {
-							Map<String, Integer> seOut =
-									new HashMap<String, Integer>();
+							Map<String, Integer> seOut = new HashMap<String, Integer>();
 							seOut.put("X", se.x);
 							seOut.put("Y", se.y);
 							seOut.put("NPC ID", se.npcID);
@@ -2041,32 +2199,34 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				spritesMap.put(y, rowOut);
 				++y;
 			}
-			
+
 			try {
 				FileWriter fw = new FileWriter(f);
 				DumperOptions options = new DumperOptions();
-			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-			    Yaml yaml = new Yaml(options);
-	        	yaml.dump(spritesMap, fw);
+				options.setDefaultFlowStyle(FlowStyle.BLOCK);
+				Yaml yaml = new Yaml(options);
+				yaml.dump(spritesMap, fw);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		public static class Hotspot {
 			int x1, y1, x2, y2;
 		}
-		
+
 		private void importHotspots(File f) {
 			InputStream input;
 			try {
 				input = new FileInputStream(f);
 				Yaml yaml = new Yaml();
-				Map<Integer, Map<String, Integer>> hsMap = (Map<Integer, Map<String, Integer>>) yaml.load(input);
-				
+				Map<Integer, Map<String, Integer>> hsMap = (Map<Integer, Map<String, Integer>>) yaml
+						.load(input);
+
 				int i;
-				for (Map.Entry<Integer, Map<String, Integer>> entry: hsMap.entrySet()) {
+				for (Map.Entry<Integer, Map<String, Integer>> entry : hsMap
+						.entrySet()) {
 					i = entry.getKey();
 					hotspots[i].x1 = entry.getValue().get("X1");
 					hotspots[i].y1 = entry.getValue().get("Y1");
@@ -2078,11 +2238,11 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void exportHotspots(File f) {
 			Map<Integer, Map<String, Integer>> hsMap = new HashMap<Integer, Map<String, Integer>>();
 			int i = 0;
-			for (Hotspot hs: hotspots) {
+			for (Hotspot hs : hotspots) {
 				Map<String, Integer> entry = new HashMap<String, Integer>();
 				entry.put("X1", hs.x1);
 				entry.put("Y1", hs.y1);
@@ -2091,72 +2251,77 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				hsMap.put(i, entry);
 				++i;
 			}
-			
+
 			try {
 				FileWriter fw = new FileWriter(f);
 				DumperOptions options = new DumperOptions();
-			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-			    Yaml yaml = new Yaml(options);
-	        	yaml.dump(hsMap, fw);
+				options.setDefaultFlowStyle(FlowStyle.BLOCK);
+				Yaml yaml = new Yaml(options);
+				yaml.dump(hsMap, fw);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void importEnemyPlacement(File f) {
 			InputStream input;
 			try {
 				input = new FileInputStream(f);
 				Yaml yaml = new Yaml();
-				Map<Integer, Map<String, Integer>> enemiesMap = (Map<Integer, Map<String, Integer>>) yaml.load(input);
-				
+				Map<Integer, Map<String, Integer>> enemiesMap = (Map<Integer, Map<String, Integer>>) yaml
+						.load(input);
+
 				int y, x;
-				for (Map.Entry<Integer, Map<String, Integer>> entry: enemiesMap.entrySet()) {
-					y = entry.getKey() / (WIDTH_IN_TILES/2);
-					x = entry.getKey() % (WIDTH_IN_TILES/2);
-					enemyPlacement[y][x] = entry.getValue().get("Enemy Map Group");
+				for (Map.Entry<Integer, Map<String, Integer>> entry : enemiesMap
+						.entrySet()) {
+					y = entry.getKey() / (WIDTH_IN_TILES / 2);
+					x = entry.getKey() % (WIDTH_IN_TILES / 2);
+					enemyPlacement[y][x] = entry.getValue().get(
+							"Enemy Map Group");
 				}
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void exportEnemyPlacement(File f) {
 			Map<Integer, Map<String, Integer>> enemiesMap = new HashMap<Integer, Map<String, Integer>>();
 			int i = 0;
-			for (int[] row: enemyPlacement) {
-				for (int ep: row) {
+			for (int[] row : enemyPlacement) {
+				for (int ep : row) {
 					Map<String, Integer> entry = new HashMap<String, Integer>();
 					entry.put("Enemy Map Group", ep);
 					enemiesMap.put(i, entry);
 					++i;
 				}
 			}
-			
+
 			try {
 				FileWriter fw = new FileWriter(f);
 				DumperOptions options = new DumperOptions();
-			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-			    Yaml yaml = new Yaml(options);
-	        	yaml.dump(enemiesMap, fw);
+				options.setDefaultFlowStyle(FlowStyle.BLOCK);
+				Yaml yaml = new Yaml(options);
+				yaml.dump(enemiesMap, fw);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void importSectors(File f) {
 			InputStream input;
 			try {
 				input = new FileInputStream(f);
 				Yaml yaml = new Yaml();
-				Map<Integer, Map<String, Object>> sectorsMap = (Map<Integer, Map<String, Object>>) yaml.load(input);
-				
+				Map<Integer, Map<String, Object>> sectorsMap = (Map<Integer, Map<String, Object>>) yaml
+						.load(input);
+
 				int y, x;
 				Sector sec;
-				for (Map.Entry<Integer, Map<String, Object>> entry: sectorsMap.entrySet()) {
+				for (Map.Entry<Integer, Map<String, Object>> entry : sectorsMap
+						.entrySet()) {
 					y = entry.getKey() / WIDTH_IN_SECTORS;
 					x = entry.getKey() % WIDTH_IN_SECTORS;
 					sec = sectors[y][x];
@@ -2173,12 +2338,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void exportSectors(File f) {
 			Map<Integer, Map<String, Object>> sectorsMap = new HashMap<Integer, Map<String, Object>>();
 			int i = 0;
-			for (Sector[] row: sectors) {
-				for (Sector s: row) {
+			for (Sector[] row : sectors) {
+				for (Sector s : row) {
 					Map<String, Object> entry = new HashMap<String, Object>();
 					entry.put("Item", s.item);
 					entry.put("Music", s.music);
@@ -2191,25 +2356,25 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					++i;
 				}
 			}
-			
+
 			try {
 				FileWriter fw = new FileWriter(f);
 				DumperOptions options = new DumperOptions();
-			    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-			    Yaml yaml = new Yaml(options);
-	        	yaml.dump(sectorsMap, fw);
+				options.setDefaultFlowStyle(FlowStyle.BLOCK);
+				Yaml yaml = new Yaml(options);
+				yaml.dump(sectorsMap, fw);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void setMapTilesFromStream(InputStream in) {
 			String tmp;
 			try {
 				for (int i = 0; i < mapTiles.length; i++) {
 					for (int j = 0; j < mapTiles[i].length; j++) {
-						tmp = ""+((char) in.read());
+						tmp = "" + ((char) in.read());
 						tmp += (char) in.read();
 						tmp += (char) in.read();
 						mapTiles[i][j] = Integer.parseInt(tmp, 16);
@@ -2220,13 +2385,14 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		private void writeMapTilesToStream(FileOutputStream out) {
 			try {
 				String tmp;
 				for (int i = 0; i < mapTiles.length; i++) {
 					for (int j = 0; j < mapTiles[i].length; j++) {
-						tmp = ToolModule.addZeros(Integer.toHexString(mapTiles[i][j]), 3);
+						tmp = ToolModule.addZeros(
+								Integer.toHexString(mapTiles[i][j]), 3);
 						out.write(tmp.charAt(0));
 						out.write(tmp.charAt(1));
 						out.write(tmp.charAt(2));
@@ -2239,22 +2405,27 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 				e.printStackTrace();
 			}
 		}
-		
+
 		public int getMapTile(int x, int y) {
 			return mapTiles[y][x];
 		}
-		
+
 		public void setMapTile(int x, int y, int tile) {
 			mapTiles[y][x] = tile;
 		}
-		
+
 		public static class Sector {
 			public int tileset = 0, palette = 0, music = 0, item;
 			public String townmap, setting, teleport;
-			
+
 			public void reset() {
-				tileset = 0; palette = 0; music = 0; item = 0;
-				townmap = "none"; setting = "none"; teleport = "disabled";
+				tileset = 0;
+				palette = 0;
+				music = 0;
+				item = 0;
+				townmap = "none";
+				setting = "none";
+				teleport = "disabled";
 			}
 
 			public void copy(Sector other) {
@@ -2267,21 +2438,25 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					this.setting = other.setting;
 					this.teleport = other.teleport;
 				} catch (Exception e) {
-					
+
 				}
 			}
 		}
-		
+
 		public static class SpriteEntry {
 			public int x, y, npcID;
+
 			public SpriteEntry(int x, int y, int npcID) {
-				this.x = x; this.y = y; this.npcID = npcID;
+				this.x = x;
+				this.y = y;
+				this.npcID = npcID;
 			}
 		}
-		
+
 		// Only store the info we need
 		public static class NPC {
 			public int sprite, direction;
+
 			public NPC(int sprite, String direction) {
 				this.sprite = sprite;
 				direction = direction.toLowerCase();
@@ -2310,8 +2485,8 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					mapTiles[i][j] = 0;
 				}
 			}
-			for (Sector[] row: sectors) {
-				for (Sector s: row) {
+			for (Sector[] row : sectors) {
+				for (Sector s : row) {
 					s.reset();
 				}
 			}
@@ -2339,20 +2514,20 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	public void save(Project proj) {
 		map.save(proj);
 	}
-	
+
 	public void refresh(Project proj) {
 		map.loadExtraResources(proj);
-		
+
 		if (isInited)
 			mapDisplay.repaint();
 	}
-	
+
 	public void reset() {
 		map.reset();
 		if (mapDisplay != null)
 			mapDisplay.reset();
 	}
-	
+
 	private void updateXYScrollBars() {
 		xScroll.removeAdjustmentListener(this);
 		xScroll.setValue(mapDisplay.getMapX());
@@ -2361,7 +2536,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		yScroll.setValue(mapDisplay.getMapY());
 		yScroll.addAdjustmentListener(this);
 	}
-	
+
 	private void updateXYFields() {
 		xField.getDocument().removeDocumentListener(this);
 		xField.setText(Integer.toString(mapDisplay.getMapX()));
@@ -2370,12 +2545,13 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		yField.setText(Integer.toString(mapDisplay.getMapY()));
 		yField.getDocument().addDocumentListener(this);
 	}
-	
+
 	// Returns true if the map palette is invalid for the new tileset
 	private boolean updatePaletteChooser(int mapTset, int mapPal) {
 		palChooser.removeActionListener(this);
 		palChooser.removeAllItems();
-		TileEditor.Tileset tileset = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(mapTset)];
+		TileEditor.Tileset tileset = TileEditor.tilesets[TileEditor
+				.getDrawTilesetNumber(mapTset)];
 		TileEditor.Tileset.Palette pal;
 		for (int i = 0; i < tileset.getPaletteCount(); i++) {
 			if ((pal = tileset.getPalette(i)).getMapTileset() == mapTset) {
@@ -2383,7 +2559,7 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			}
 		}
 		if (mapPal >= palChooser.getItemCount()) {
-			palChooser.setSelectedIndex(palChooser.getItemCount()-1);
+			palChooser.setSelectedIndex(palChooser.getItemCount() - 1);
 			palChooser.addActionListener(this);
 			return true;
 		} else {
@@ -2417,33 +2593,36 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 					palChooser.setSelectedIndex(sect.palette);
 					palChooser.addActionListener(this);
 				}
-				
+
 				if (musicChooser.getSelectedIndex() != sect.music) {
 					musicChooser.removeActionListener(this);
 					musicChooser.setSelectedIndex(sect.music);
 					musicChooser.addActionListener(this);
 				}
-				
+
 				if (tileSelector != null)
 					tileSelector.repaint();
 			}
 		} else if (e.getSource().equals(tilesetChooser)) {
-			mapDisplay.setSelectedSectorTileset(tilesetChooser.getSelectedIndex());
+			mapDisplay.setSelectedSectorTileset(tilesetChooser
+					.getSelectedIndex());
 			if (updatePaletteChooser(mapDisplay.getSelectedSector().tileset,
 					mapDisplay.getSelectedSector().palette))
-				mapDisplay.setSelectedSectorPalette(palChooser.getSelectedIndex());
+				mapDisplay.setSelectedSectorPalette(palChooser
+						.getSelectedIndex());
 			mapDisplay.repaint();
 			tileSelector.repaint();
 		} else if (e.getSource().equals(palChooser)) {
 			mapDisplay.setSelectedSectorPalette(palChooser.getSelectedIndex());
 			tileSelector.repaint();
 		} else if (e.getSource().equals(musicChooser)) {
-			mapDisplay.getSelectedSector().music = musicChooser.getSelectedIndex();
+			mapDisplay.getSelectedSector().music = musicChooser
+					.getSelectedIndex();
 		} else if (e.getActionCommand().equals("apply")) {
-        	// TODO
-        } else if (e.getActionCommand().equals("close")) {
-            hide();
-        } else if (e.getActionCommand().equals("mode0")) {
+			// TODO
+		} else if (e.getActionCommand().equals("close")) {
+			hide();
+		} else if (e.getActionCommand().equals("mode0")) {
 			mapDisplay.changeMode(0);
 			mapDisplay.repaint();
 			tileSelector.changeMode(0);
@@ -2479,10 +2658,12 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			tileSelector.changeMode(9);
 			tileSelector.repaint();
 		} else if (e.getActionCommand().equals("delAllSprites")) {
-			int sure = JOptionPane.showConfirmDialog(mainWindow,
-					"Are you sure you want to delete all of the sprites?\n"
-					+ "Note that the game may crash if less than 8 sprites exist on the map.",
-					"Are you sure?", JOptionPane.YES_NO_OPTION);
+			int sure = JOptionPane
+					.showConfirmDialog(
+							mainWindow,
+							"Are you sure you want to delete all of the sprites?\n"
+									+ "Note that the game may crash if less than 8 sprites exist on the map.",
+							"Are you sure?", JOptionPane.YES_NO_OPTION);
 			if (sure == JOptionPane.YES_OPTION) {
 				map.nullSpriteData();
 				mapDisplay.repaint();
@@ -2541,55 +2722,41 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 		} else if (e.getActionCommand().equals("mapchanges")) {
 			mapDisplay.toggleMapChanges();
 		} else if (e.getActionCommand().equals("sectorEdit")) {
-			//net.starmen.pkhack.JHack.main.showModule(
-			//		MapSectorPropertiesEditor.class, gfxcontrol
-			//				.getSectorxy());
+			// net.starmen.pkhack.JHack.main.showModule(
+			// MapSectorPropertiesEditor.class, gfxcontrol
+			// .getSectorxy());
 		} else if (e.getActionCommand().equals("findSprite")) {
 			String tpt = JOptionPane.showInputDialog(mainWindow,
-					"Enter TPT entry to search for.", Integer
-							.toHexString(0));
+					"Enter TPT entry to search for.", Integer.toHexString(0));
 			int tptNum, yesno;
 			try {
 				tptNum = Integer.parseInt(tpt, 16);
 			} catch (NumberFormatException nfe) {
-				JOptionPane.showMessageDialog(mainWindow,
-						"\"" + tpt + "\" is not a valid hexidecimal number.\n"
-						+ "Search was aborted.",
-						"Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(mainWindow, "\"" + tpt
+						+ "\" is not a valid hexidecimal number.\n"
+						+ "Search was aborted.", "Error",
+						JOptionPane.ERROR_MESSAGE);
 				return;
 			}
-			/*if (tpt != null) {
-				for (int i = 0; i < (MapData.HEIGHT_IN_SECTORS / 2)
-						* MapData.WIDTH_IN_SECTORS; i++) {
-					ArrayList sprites = map.getSpritesData(i);
-					MapData.SpriteLocation spLoc;
-					int areaY, areaX;
-					for (int j = 0; j < sprites.size(); j++) {
-						spLoc = (MapData.SpriteLocation) sprites.get(j);
-						if (spLoc.getTpt() == tptNum) {
-							areaY = i / MapEditor.widthInSectors;
-							areaX = i - (areaY * MapEditor.widthInSectors);
-							gfxcontrol
-									.setMapXY(
-											(areaX * MapEditor.sectorWidth)
-													+ (spLoc.getX() / MapEditor.tileWidth),
-											(areaY * MapEditor.sectorHeight * 2)
-													+ (spLoc.getY() / MapEditor.tileHeight));
-							yesno = JOptionPane
-									.showConfirmDialog(
-											mainWindow,
-											"I found a sprite with that TPT entry. Do you want to find another?",
-											"Continue Search?",
-											JOptionPane.YES_NO_OPTION);
-							if (yesno == JOptionPane.NO_OPTION)
-								return;
-						}
-					}
-				}
-				JOptionPane.showMessageDialog(mainWindow,
-						"Could not find a sprite entry using TPT entry 0x"
-								+ tpt + ".");
-			}*/
+			/*
+			 * if (tpt != null) { for (int i = 0; i < (MapData.HEIGHT_IN_SECTORS
+			 * / 2) MapData.WIDTH_IN_SECTORS; i++) { ArrayList sprites =
+			 * map.getSpritesData(i); MapData.SpriteLocation spLoc; int areaY,
+			 * areaX; for (int j = 0; j < sprites.size(); j++) { spLoc =
+			 * (MapData.SpriteLocation) sprites.get(j); if (spLoc.getTpt() ==
+			 * tptNum) { areaY = i / MapEditor.widthInSectors; areaX = i -
+			 * (areaY * MapEditor.widthInSectors); gfxcontrol .setMapXY( (areaX
+			 * * MapEditor.sectorWidth) + (spLoc.getX() / MapEditor.tileWidth),
+			 * (areaY * MapEditor.sectorHeight * 2) + (spLoc.getY() /
+			 * MapEditor.tileHeight)); yesno = JOptionPane .showConfirmDialog(
+			 * mainWindow,
+			 * "I found a sprite with that TPT entry. Do you want to find another?"
+			 * , "Continue Search?", JOptionPane.YES_NO_OPTION); if (yesno ==
+			 * JOptionPane.NO_OPTION) return; } } }
+			 * JOptionPane.showMessageDialog(mainWindow,
+			 * "Could not find a sprite entry using TPT entry 0x" + tpt + ".");
+			 * }
+			 */
 		} else if (e.getActionCommand().equals("copySector")) {
 			pasteSector.setEnabled(true);
 
@@ -2597,54 +2764,56 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 			int sectorY = mapDisplay.getSectorY();
 			for (int i = 0; i < copiedSectorTiles.length; i++)
 				for (int j = 0; j < copiedSectorTiles[i].length; j++)
-					copiedSectorTiles[i][j] = map.getMapTile(
-							j + sectorX * 8, i + sectorY * 4);
+					copiedSectorTiles[i][j] = map.getMapTile(j + sectorX * 8, i
+							+ sectorY * 4);
 			copiedSector = map.getSector(sectorX, sectorY);
 		} else if (e.getActionCommand().equals("pasteSector")) {
 			int sectorX = mapDisplay.getSectorX();
 			int sectorY = mapDisplay.getSectorY();
-			mapDisplay.pasteSector(copiedSector, sectorX, sectorY, copiedSectorTiles);
+			mapDisplay.pasteSector(copiedSector, sectorX, sectorY,
+					copiedSectorTiles);
 			mapDisplay.repaint();
-			//gfxcontrol.updateComponents();
-		/*} else if (ac.equals(ENEMY_SPRITES)) {
-			gfxcontrol.toggleEnemySprites();
-		} else if (ac.equals(ENEMY_COLORS)) {
-			gfxcontrol.toggleEnemyColors();
-		} else if (ac.equals(EVENTPAL)) {
-			gfxcontrol.toggleEventPalette();*/
+			// gfxcontrol.updateComponents();
+			/*
+			 * } else if (ac.equals(ENEMY_SPRITES)) {
+			 * gfxcontrol.toggleEnemySprites(); } else if
+			 * (ac.equals(ENEMY_COLORS)) { gfxcontrol.toggleEnemyColors(); }
+			 * else if (ac.equals(EVENTPAL)) { gfxcontrol.toggleEventPalette();
+			 */
 		} else if (e.getActionCommand().equals("undoMap")) {
 			if (!mapDisplay.undoMapAction()) {
 				JOptionPane.showMessageDialog(mainWindow,
-						"There are no actions to undo.",
-						"Error", JOptionPane.ERROR_MESSAGE);
+						"There are no actions to undo.", "Error",
+						JOptionPane.ERROR_MESSAGE);
 			}
 		} else if (e.getActionCommand().equals("redoMap")) {
 			if (!mapDisplay.redoMapAction()) {
 				JOptionPane.showMessageDialog(mainWindow,
-						"There are no actions to redo.",
-						"Error", JOptionPane.ERROR_MESSAGE);
+						"There are no actions to redo.", "Error",
+						JOptionPane.ERROR_MESSAGE);
 			}
 		}
 	}
 
 	public void changedUpdate(DocumentEvent e) {
-		if ((e.getDocument().equals(xField.getDocument())
-					|| e.getDocument().equals(yField.getDocument()))
+		if ((e.getDocument().equals(xField.getDocument()) || e.getDocument()
+				.equals(yField.getDocument()))
 				&& (yField.getText().length() > 0)
 				&& (xField.getText().length() > 0)) {
-			int newX = Integer.parseInt(xField.getText()),
-				newY = Integer.parseInt(yField.getText());
+			int newX = Integer.parseInt(xField.getText()), newY = Integer
+					.parseInt(yField.getText());
 			if (newX > MapData.WIDTH_IN_TILES - mapDisplay.getScreenWidth()) {
-				newY = MapData.WIDTH_IN_TILES - mapDisplay.getScreenHeight();
-			} else if (newY < 0) {
-				newY = 0;
+				newX = MapData.WIDTH_IN_TILES - mapDisplay.getScreenWidth();
+			} else if (newX < 0) {
+				newX = 0;
 			}
 			if (newY > MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight()) {
 				newY = MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight();
 			} else if (newY < 0) {
 				newY = 0;
 			}
-			if ((newX != mapDisplay.getMapX()) || (newY != mapDisplay.getMapY())) {
+			if ((newX != mapDisplay.getMapX())
+					|| (newY != mapDisplay.getMapY())) {
 				mapDisplay.setMapXY(newX, newY);
 				updateXYScrollBars();
 				mapDisplay.repaint();
@@ -2669,43 +2838,57 @@ public class MapEditor extends ToolModule implements ActionListener, DocumentLis
 	}
 
 	public void mouseWheelMoved(MouseWheelEvent e) {
-		int y = mapDisplay.getMapY() + (e.getWheelRotation() * 3);
-		if (y > MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight())
-			y = MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight();
-		else if (y < 0)
-			y = 0;
-		if (y != mapDisplay.getMapY()) {
-			mapDisplay.setMapY(y);
-			updateXYScrollBars();
-			updateXYFields();
-			mapDisplay.repaint();
+		if (e.isControlDown()) { // Horizontal scrolling
+			int x = mapDisplay.getMapX() + (e.getWheelRotation() * 4);
+			x = Math.min(x,
+					MapData.WIDTH_IN_TILES - mapDisplay.getScreenWidth());
+			x = Math.max(x, 0);
+			if (x != mapDisplay.getMapX()) {
+				mapDisplay.setMapX(x);
+				updateXYScrollBars();
+				updateXYFields();
+				mapDisplay.repaint();
+			}
+		} else { // Vertical scrolling
+			int y = mapDisplay.getMapY() + (e.getWheelRotation() * 4);
+			y = Math.min(y,
+					MapData.HEIGHT_IN_TILES - mapDisplay.getScreenHeight());
+			y = Math.max(y, 0);
+			if (y != mapDisplay.getMapY()) {
+				mapDisplay.setMapY(y);
+				updateXYScrollBars();
+				updateXYFields();
+				mapDisplay.repaint();
+			}
 		}
-	}
 
+	}
 
 	@Override
 	public void componentHidden(ComponentEvent arg0) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void componentMoved(ComponentEvent arg0) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void componentResized(ComponentEvent arg0) {
 		Dimension newD = mapDisplay.getSize();
-		int newSW = newD.width / 32 + 1, newSH = newD.height / 32 + 1;
+		int newSW = newD.width / 32, newSH = newD.height / 32;
 		mapDisplay.setScreenSize(newSW, newSH);
+		updateXYScrollBars();
+		updateXYFields();
 		tileSelector.setScreenSize(newSW);
-	} 
+	}
 
 	@Override
 	public void componentShown(ComponentEvent arg0) {
 		// TODO Auto-generated method stub
-		
+
 	}
 }
