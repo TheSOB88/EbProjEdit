@@ -218,11 +218,11 @@ public class MapEditor extends ToolModule implements ActionListener,
 		checkBox.setActionCommand("grid");
 		checkBox.addActionListener(this);
 		menu.add(checkBox);
-		checkBox = new JCheckBoxMenuItem("Highlight Selected Tile");
+		checkBox = new JCheckBoxMenuItem("Enable Highlighting");
         checkBox.setAccelerator( KeyStroke.getKeyStroke( "control F" ) );
 		checkBox.setMnemonic('h');
 		checkBox.setSelected(true);
-		checkBox.setActionCommand("highlightSelectedTile");
+		checkBox.setActionCommand("toggleHighlighting");
 		checkBox.addActionListener(this);
 		menu.add(checkBox);
 		checkBox = new JCheckBoxMenuItem("Show Tile Numbers");
@@ -463,7 +463,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 		// Mode settings
 		private int previousMode = 0;
 		private int togglePreviousMode = -1;
-		private boolean editMap = true, drawTileNums = false, highlightSelectedTile = true;
+		private boolean editMap = true, drawTileNums = false, enableHighlighting = true;
 		private String submode = null;
 		private List<Integer> highlightedTiles = null;
 		
@@ -598,13 +598,16 @@ public class MapEditor extends ToolModule implements ActionListener,
 								prefs.getValueAsBoolean( "useHexNumbers" ), false);
 					}
 					
-                    if( highlightSelectedTile && mapTile == tileSelector.getSelectedTile() ) {
+                    if( enableHighlighting && mapTile == tileSelector.getSelectedTile() 
+                    		&& sector.tileset == mapEditor.tilesetChooser.getSelectedIndex() ) {
 						g.setPaint(Color.white);
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
 						g.fillRect(j * MapData.TILE_HEIGHT + 1, i * MapData.TILE_WIDTH + 1, MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
                     }
-                    if( highlightSelectedTile && highlightedTiles != null && highlightedTiles.contains( mapTile ) ) {
+                    if( ( enableHighlighting || ( submode != null && submode.equals( "highlightMultipleTiles" ) ) )
+                    		&& highlightedTiles != null && highlightedTiles.contains( mapTile ) 
+                    		&& sector.tileset == mapEditor.tilesetChooser.getSelectedIndex() ) {
                     	g.setPaint( colorFromInt( highlightedTiles.indexOf( mapTile ) ) );
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
 						g.fillRect(j * MapData.TILE_HEIGHT + 1, i * MapData.TILE_WIDTH + 1, MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
@@ -962,10 +965,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 			MapData.Sector newS = map.getSector(sectorX, sectorY);
 			if (selectedSector != newS) {
 				selectedSector = newS;
-				sectorPal = TileEditor.tilesets[TileEditor
-						.getDrawTilesetNumber(selectedSector.tileset)]
-						.getPaletteNum(selectedSector.tileset,
-								selectedSector.palette);
+				sectorPal = TileEditor.tilesets[TileEditor.getDrawTilesetNumber(selectedSector.tileset)]
+						.getPaletteNum(selectedSector.tileset, selectedSector.palette);
 				copySector.setEnabled(true);
 				pasteSector.setEnabled(true);
 			} else {
@@ -1487,8 +1488,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 			drawTileNums = !drawTileNums;
 		}
 
-		public void toggleHighlightSelectedTile() {
-			highlightSelectedTile = !highlightSelectedTile;
+		public void toggleHighlighting() {
+			enableHighlighting = !enableHighlighting;
 		}
 
 		public void toggleSpriteNums() {
@@ -2808,8 +2809,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 		} else if (e.getActionCommand().equals("tileNums")) {
 			mapDisplay.toggleTileNums();
 			mapDisplay.repaint();
-		} else if (e.getActionCommand().equals("highlightSelectedTile")) {
-			mapDisplay.toggleHighlightSelectedTile();
+		} else if (e.getActionCommand().equals("toggleHighlighting")) {
+			mapDisplay.toggleHighlighting();
 			mapDisplay.repaint();
 		} else if (e.getActionCommand().equals("npcNums")) {
 			mapDisplay.toggleSpriteNums();
