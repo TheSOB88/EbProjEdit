@@ -411,7 +411,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 		private class UndoableTileChange implements UndoableAction {
 			public int x, y, oldTile, newTile;
 
-			public UndoableTileChange(int x, int y, int oldTile, int newTile) {
+			public UndoableTileChange( int x, int y, int oldTile, int newTile ) {
 				this.x = x;
 				this.y = y;
 				this.oldTile = oldTile;
@@ -427,12 +427,35 @@ public class MapEditor extends ToolModule implements ActionListener,
 			}
 		}
 		
-//		private class UndoablePaste implements UndoableAction {
-//			public int x, y;
-//			public int[] oldTile;
-//			public int[] newTile;
-//		}
-//
+		private class UndoablePaste implements UndoableAction {
+			public int x, y;
+			public int[][] oldTiles;
+			public int[][] newTiles;
+			
+			public UndoablePaste( int _x, int _y, int[][] _oldTiles, int[][] _newTiles ) {
+				x = _x;
+				y = _y;
+				oldTiles = _oldTiles;
+				newTiles = _newTiles;
+			}
+			
+			public void undo(MapData map) {
+				for( int i = 0; i < oldTiles.length; i++ ) {
+        			for( int j = 0; j < oldTiles[0].length; j++ ) {
+        				map.setMapTile( x + i, y + j, oldTiles[i][j] );
+        			}
+        		}
+			}
+			
+			public void redo(MapData map) {
+				for( int i = 0; i < newTiles.length; i++ ) {
+        			for( int j = 0; j < newTiles[0].length; j++ ) {
+        				map.setMapTile( x + i, y + j, newTiles[i][j] );
+        			}
+        		}
+			}
+		}
+
 //		private class UndoableSectorPaste implements UndoableAction {
 //			public int sectorX, sectorY;
 //			private int[][] tiles;
@@ -1390,15 +1413,23 @@ public class MapEditor extends ToolModule implements ActionListener,
             		int rectWidth = Math.abs( selectAreaX2 - selectAreaX1 ) + 1;
             		int rectHeight = Math.abs( selectAreaY2 - selectAreaY1 ) + 1;
             		
+            		int[][] oldTiles = new int[rectWidth][rectHeight];
+            		for( int i = 0; i < rectWidth; i++ ) {
+            			for( int j = 0; j < rectHeight; j++ ) {
+            				oldTiles[i][j] = map.getMapTile( mX + i, mY + j );
+            			}
+            		}
+            		
+            		int[][] newTiles = new int[rectWidth][rectHeight];
             		for( int i = 0; i < rectWidth; i++ ) {
             			for( int j = 0; j < rectHeight; j++ ) {
             				int fromTile = map.getMapTile( rectX + i, rectY + j );
-            				
-							undoStack.push( new UndoableTileChange( mX + i, mY + j, map.getMapTile( mX + i, mY + j ), fromTile ) );
-							
             				map.setMapTile( mX + i, mY + j, fromTile );
+            				newTiles[i][j] = fromTile;
             			}
             		}
+            		
+            		undoStack.push( new UndoablePaste( mX, mY, oldTiles, newTiles ) );
 					undoButton.setEnabled( true );
 					redoStack.clear();
 					repaint();
