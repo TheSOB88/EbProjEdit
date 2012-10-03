@@ -402,8 +402,13 @@ public class MapEditor extends ToolModule implements ActionListener,
 				ActionEvent.ACTION_PERFORMED, "sectorChanged");
 
 		private static Image[][][] tileImageCache;
-
-		private class UndoableTileChange {
+		
+		private interface UndoableAction {
+			public void redo( MapData map );
+			public void undo( MapData map );
+		}
+		
+		private class UndoableTileChange implements UndoableAction {
 			public int x, y, oldTile, newTile;
 
 			public UndoableTileChange(int x, int y, int oldTile, int newTile) {
@@ -412,25 +417,39 @@ public class MapEditor extends ToolModule implements ActionListener,
 				this.oldTile = oldTile;
 				this.newTile = newTile;
 			}
-		}
-
-		private class UndoableSectorPaste {
-			public int sectorX, sectorY;
-			private int[][] tiles;
-			private Sector sector;
-
-			public UndoableSectorPaste(int sectorX, int sectorY, int[][] tiles,
-					Sector sector) {
-				this.sectorX = sectorX;
-				this.sectorY = sectorY;
-				this.tiles = tiles;
-				this.sector = sector;
+			
+			public void redo( MapData map ) {
+				map.setMapTile( x, y, newTile );
 			}
-
+			
+			public void undo( MapData map ) {
+				map.setMapTile( x, y, oldTile );
+			}
 		}
+		
+//		private class UndoablePaste implements UndoableAction {
+//			public int x, y;
+//			public int[] oldTile;
+//			public int[] newTile;
+//		}
+//
+//		private class UndoableSectorPaste implements UndoableAction {
+//			public int sectorX, sectorY;
+//			private int[][] tiles;
+//			private Sector sector;
+//
+//			public UndoableSectorPaste(int sectorX, int sectorY, int[][] tiles,
+//					Sector sector) {
+//				this.sectorX = sectorX;
+//				this.sectorY = sectorY;
+//				this.tiles = tiles;
+//				this.sector = sector;
+//			}
+//
+//		}
 
-		private Stack<Object> undoStack = new Stack<Object>();
-		private Stack<Object> redoStack = new Stack<Object>();
+		private Stack<UndoableAction> undoStack = new Stack<UndoableAction>();
+		private Stack<UndoableAction> redoStack = new Stack<UndoableAction>();
 
 		private int screenWidth = 24;
 		private int screenHeight = 12;
@@ -1192,7 +1211,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 						}
 						repaint();
 						tileSelector.repaint();
-					}
+					} 
 				} else if (editSprites) {
 					if (e.getButton() == MouseEvent.BUTTON3) {
 						popupX = e.getX();
@@ -1360,13 +1379,30 @@ public class MapEditor extends ToolModule implements ActionListener,
 					}
 				}
 			}  else if (e.getButton() == MouseEvent.BUTTON3) {
-				// Make sure they didn't click on the border
-				///TODO: Select multiple sectors?
-//					int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH))
-//							/ MapData.SECTOR_WIDTH;
-//					int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT))
-//							/ MapData.SECTOR_HEIGHT;
-//					selectSector(sX, sY);
+				/**TODO: Select multiple sectors?*/
+				if( submode.equals( "selectArea" ) ) {
+					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
+					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
+					
+					//copy tiles from selection
+            		int rectX = selectAreaX1 > selectAreaX2 ? selectAreaX2 : selectAreaX1;
+            		int rectY = selectAreaY1 > selectAreaY2 ? selectAreaY2 : selectAreaY1;
+            		int rectWidth = Math.abs( selectAreaX2 - selectAreaX1 ) + 1;
+            		int rectHeight = Math.abs( selectAreaY2 - selectAreaY1 ) + 1;
+            		
+            		for( int i = 0; i < rectWidth; i++ ) {
+            			for( int j = 0; j < rectHeight; j++ ) {
+            				int fromTile = map.getMapTile( rectX + i, rectY + j );
+            				
+							undoStack.push( new UndoableTileChange( mX + i, mY + j, map.getMapTile( mX + i, mY + j ), fromTile ) );
+							
+            				map.setMapTile( mX + i, mY + j, fromTile );
+            			}
+            		}
+					undoButton.setEnabled( true );
+					redoStack.clear();
+					repaint();
+				}
 			}
 		}
 
@@ -1433,7 +1469,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 							undoButton.setEnabled( true );
 							redoStack.clear();
 	
-							map.setMapTile(mX, mY, tileSelector.getSelectedTile());
+							map.setMapTile( mX, mY, tileSelector.getSelectedTile() );
 							repaint();
 							
 							dragTileX = mX;
@@ -1610,14 +1646,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 
 		public boolean undoMapAction() {
 			if (!undoStack.empty()) {
-				Object undo = undoStack.pop();
-				if (undo instanceof UndoableTileChange) {
-					UndoableTileChange tc = (UndoableTileChange) undo;
-					map.setMapTile(tc.x, tc.y, tc.oldTile);
-				} else if (undo instanceof UndoableSectorPaste) {
-					// UndoableSectorPaste usp = (UndoableSectorPaste) undo;
-					// TODO
-				}
+				UndoableAction undo = undoStack.pop();
+				undo.undo( map );
 				if (undoStack.isEmpty())
 					undoButton.setEnabled(false);
 				redoStack.push(undo);
@@ -1630,13 +1660,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 
 		public boolean redoMapAction() {
 			if (!redoStack.empty()) {
-				Object redo = redoStack.pop();
-				if (redo instanceof UndoableTileChange) {
-					UndoableTileChange tc = (UndoableTileChange) redo;
-					map.setMapTile(tc.x, tc.y, tc.newTile);
-				} else if (redo instanceof UndoableSectorPaste) {
-					// TODO
-				}
+				UndoableAction redo = redoStack.pop();
+				redo.redo( map );
 				if (redoStack.isEmpty())
 					redoButton.setEnabled(false);
 				undoStack.push(redo);
