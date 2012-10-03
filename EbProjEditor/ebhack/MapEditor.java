@@ -604,8 +604,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
 						g.fillRect(j * MapData.TILE_HEIGHT + 1, i * MapData.TILE_WIDTH + 1, MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
-                    }
-                    if( ( enableHighlighting || ( submode != null && submode.equals( "highlightMultipleTiles" ) ) )
+                    } else if( ( enableHighlighting || ( submode != null && submode.equals( "highlightMultipleTiles" ) ) )
                     		&& highlightedTiles != null && highlightedTiles.contains( mapTile ) 
                     		&& sector.tileset == mapEditor.tilesetChooser.getSelectedIndex() ) {
                     	g.setPaint( colorFromInt( highlightedTiles.indexOf( mapTile ) ) );
@@ -1158,7 +1157,10 @@ public class MapEditor extends ToolModule implements ActionListener,
 						if( this.highlightedTiles == null ) {
 							this.highlightedTiles = new ArrayList<Integer>();
 						}
-						highlightedTiles.add( new Integer( map.getMapTile( mX, mY ) ) );
+						int mapTile = map.getMapTile( mX, mY );
+						if( !highlightedTiles.contains( mapTile ) ) {
+							highlightedTiles.add( new Integer( map.getMapTile( mX, mY ) ) );
+						}
 						repaint();
 						tileSelector.repaint();
 					}
@@ -1720,8 +1722,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 							g.fillRect(i * MapData.TILE_WIDTH + 1, j * MapData.TILE_HEIGHT + 1,
 									MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
 							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
-						}
-	                    if( mapDisplay.highlightedTiles != null && mapDisplay.highlightedTiles.contains( dtile ) ) {
+						} else if( mapDisplay.highlightedTiles != null && mapDisplay.highlightedTiles.contains( dtile ) ) {
 	                    	g.setPaint( colorFromInt( mapDisplay.highlightedTiles.indexOf( dtile ) ) );
 							g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
 							g.fillRect(i * MapData.TILE_WIDTH + 1, j * MapData.TILE_HEIGHT + 1, MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
@@ -2997,13 +2998,13 @@ public class MapEditor extends ToolModule implements ActionListener,
 			colorsFromInts = new ArrayList<Color>();
 			colorsFromInts.add( Color.orange );
 			colorsFromInts.add( Color.yellow );
-			colorsFromInts.add( new Color( 140, 255, 0 ) );
 			colorsFromInts.add( Color.green );
 			colorsFromInts.add( new Color( 0, 255, 180 ) );
 			colorsFromInts.add( Color.cyan );
 			colorsFromInts.add( Color.blue );
 			colorsFromInts.add( Color.magenta );
 			colorsFromInts.add( Color.pink );
+			colorsFromInts.add( Color.red );
 		}
 		return colorsFromInts.get( index % colorsFromInts.size() );
 	}
