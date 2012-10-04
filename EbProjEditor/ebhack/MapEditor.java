@@ -155,8 +155,10 @@ public class MapEditor extends ToolModule implements ActionListener,
 		menu.add(new JSeparator());
 		menu.add(ToolModule.createJMenuItem("Highlight Multiple Tiles", 'h', "control H",
 				"highlightMultipleTilesExternal", this));
-		menu.add(ToolModule.createJMenuItem("Select Area", 's', "S",
+		menu.add(ToolModule.createJMenuItem("Select Area", 'a', "A",
 				"selectAreaExternal", this));
+		menu.add(ToolModule.createJMenuItem("Select Snakey Area", 's', "S",
+				"selectSnakeyAreaExternal", this));
 		menuBar.add(menu);
 
 		modeMenu = new JMenu("Mode");
@@ -693,6 +695,15 @@ public class MapEditor extends ToolModule implements ActionListener,
 					  Math.abs( selectAreaY2 - selectAreaY1 ) * MapData.TILE_HEIGHT + MapData.TILE_HEIGHT - 2 ) );
             	}
             }
+			
+			//draw snakey selection
+            if( editMap && subMode != null && subMode.equals( "selectSnakeyArea" ) ) {
+            	if( selectAreaX1 != -1 ) {
+            		DRAW THE SNAKE!;
+            		
+                	g.setPaint(Color.red);
+            	}
+            }
 
 			if (editMap && (selectedSector != null)) {
 				int sXt, sYt;
@@ -1178,7 +1189,6 @@ public class MapEditor extends ToolModule implements ActionListener,
 					this.highlightedTiles = null;	
 					mapEditor.statusLabel.setText( "Entered Highlight Tiles Mode" );
 				}
-				repaint();
 				tileSelector.repaint();
 			} else if( cmd.equals( "selectArea" ) ) {
 				if( this.subMode != null && this.subMode.equals( "selectArea" ) ) {
@@ -1187,6 +1197,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 
 					this.setCursor( Cursor.getDefaultCursor() );
 				} else {
+					mapEditor.statusLabel.setText( "Entered Select Area Mode" );
 					clearSubmodes();
 					this.subMode = "selectArea";
 					this.selectAreaX1 = -1;
@@ -1196,7 +1207,23 @@ public class MapEditor extends ToolModule implements ActionListener,
 					
 					this.setCursor( new Cursor( Cursor.CROSSHAIR_CURSOR ) );
 				}
+			} else if( cmd.equals( "selectSnakeyArea" ) ) {
+				if( this.subMode != null && this.subMode.equals( "selectSnakeyArea" ) ) {
+					this.subMode = null;
+					mapEditor.statusLabel.setText( "Exited Select Snakey Area Mode" );
+
+					this.setCursor( Cursor.getDefaultCursor() );
+				} else {
+					mapEditor.statusLabel.setText( "Entered Select Snakey Area Mode" );
+					clearSubmodes();
+					this.subMode = "selectSnakeyArea";
+					this.selectAreaX1 = -1;
+					this.selectAreaY1 = -1;
+					
+					this.setCursor( new Cursor( Cursor.HAND_CURSOR ) );
+				}
 			}
+			repaint();
 		}
 
 		public void mouseClicked(MouseEvent e) {
@@ -1374,15 +1401,18 @@ public class MapEditor extends ToolModule implements ActionListener,
 								tileSelector.selectTile(map.getMapTile(mX, mY));
 							} else if( e.isControlDown() ) {							
 							} else {
-								// Keep track of the undo stuff
-								undoStack.push(new UndoableTileChange(mX, mY, map
-										.getMapTile(mX, mY), tileSelector
-										.getSelectedTile()));
-								undoButton.setEnabled(true);
-								redoStack.clear();
-	
-								map.setMapTile(mX, mY, tileSelector.getSelectedTile());
-								repaint();
+								int oldTile = map.getMapTile( mX, mY );
+								int newTile = tileSelector.getSelectedTile();
+								
+								if( oldTile != newTile ) {
+									// Keep track of the undo stuff
+									undoStack.push( new UndoableTileChange( mX, mY, oldTile, newTile ) );
+									undoButton.setEnabled( true );
+									redoStack.clear();
+		
+									map.setMapTile( mX, mY, tileSelector.getSelectedTile() );
+									repaint();
+								}
 								
 								dragTileX = mX;
 								dragTileY = mY;
@@ -1395,12 +1425,21 @@ public class MapEditor extends ToolModule implements ActionListener,
 						selectAreaY1 = selectAreaY2 = mY;
 						
 						repaint();
+					} else if( subMode.equals( "selectSnakeyArea" ) ) {
+						dragType = "selectSnake";
+						
+						selectAreaX1 = mX;
+						selectAreaY1 = mY;
+						
+						repaint();
 					}
 				}
-			}  else if (e.getButton() == MouseEvent.BUTTON3) {
+			}  else if( e.getButton() == MouseEvent.BUTTON3 ) {
 				/**TODO: Select multiple sectors?*/
-				//Select Area
-				if( subMode.equals( "selectArea" ) ) {
+				if( subMode == null ) {
+				}
+				//Paste Area
+				else if( subMode.equals( "selectArea" ) ) {
 					dragType = "paste";
 					
 					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
@@ -1409,7 +1448,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 					//copy tiles from selection
             		int rectX = selectAreaX1 > selectAreaX2 ? selectAreaX2 : selectAreaX1;
             		int rectY = selectAreaY1 > selectAreaY2 ? selectAreaY2 : selectAreaY1;
-            		int rectWidth = Math.abs( selectAreaX2 - selectAreaX1 ) + 1;
+            		int rectWidth  = Math.abs( selectAreaX2 - selectAreaX1 ) + 1;
             		int rectHeight = Math.abs( selectAreaY2 - selectAreaY1 ) + 1;
             		
             		//save old tiles (for undo)
@@ -1434,6 +1473,19 @@ public class MapEditor extends ToolModule implements ActionListener,
             				map.setMapTile( mX + i, mY + j, newTiles[i][j] );
             			}
             		}
+            		
+            		undoStack.push( new UndoablePaste( mX, mY, oldTiles, newTiles ) );
+					undoButton.setEnabled( true );
+					redoStack.clear();
+					repaint();
+				} else if( subMode.equals( "selectSnakeyArea" ) ) {
+					dragType = "snakeyPaste";
+					
+					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
+					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
+					
+					//TODO: Create Undo
+					//TODO: Paste Snake
             		
             		undoStack.push( new UndoablePaste( mX, mY, oldTiles, newTiles ) );
 					undoButton.setEnabled( true );
@@ -1464,13 +1516,26 @@ public class MapEditor extends ToolModule implements ActionListener,
 					dragTileX = dragTileY = -1;
 					mapEditor.statusLabel.setText( "OK" );
 				} else if( editMap && subMode.equals( "selectArea" ) ) {
+					if( dragType == null ) {
+						mapEditor.statusLabel.setText( "dragType is null wtf" );
+					}
 					if( dragType.equals( "select" ) ) {
 						mapEditor.statusLabel.setText( "Select finished" );
 						dragType = null;
-					} else if( dragType.equals( "paste" ) ) {
-						mapEditor.statusLabel.setText( "Paste finished" );
-						dragType = null;
 					}
+				}
+			} else if( e.getButton() == 3 ) {
+				if( dragType == null ) {
+				}
+				//Paste
+				else if( dragType.equals( "paste" ) ) {
+					mapEditor.statusLabel.setText( "Paste finished" );
+					dragType = null;
+				}
+				//Paste snake
+				else if( dragType.equals( "snakeyPaste" ) ) {
+					mapEditor.statusLabel.setText( "Snakey Paste finished" );
+					dragType = null;
 				}
 			}
 		}
@@ -1504,8 +1569,10 @@ public class MapEditor extends ToolModule implements ActionListener,
 				int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
 				int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
 				
-				if( dragType == null || dragType.equals( "select" ) ) {
-					if( subMode == null ) {
+				if( subMode == null ) { 
+					mapEditor.statusLabel.setText( "dragType: " + dragType );
+					//Pencil-dragging tiles
+					if( dragType == null ) {
 						if( enableDraggingTiles ) {
 							mapEditor.statusLabel.setText( "dragging tiles" );
 							if( e.isControlDown() ) {							
@@ -1523,8 +1590,14 @@ public class MapEditor extends ToolModule implements ActionListener,
 								dragTileY = mY;
 							}
 						}
+					}
+				} else if( subMode.equals( "selectArea" ) ) {
+					if( dragType == null ) {
+						mapEditor.statusLabel.setText( "null dragType in selectArea mode... ???" );
+					}
+					
 					//Select Area
-					} else if( subMode.equals( "selectArea" ) ) {
+					if( dragType.equals( "select" ) ) {
 						mapEditor.statusLabel.setText( "Selecting Area" );
 						
 						selectAreaX2 = mX;
@@ -1532,32 +1605,49 @@ public class MapEditor extends ToolModule implements ActionListener,
 						
 						repaint();
 					}
-				//Paste
-				} else if( dragType.equals( "paste" ) ) {
-					mapEditor.statusLabel.setText( "Pasting/Moving Paste" );
+					//Paste
+					else if( dragType.equals( "paste" ) ) {
+						mapEditor.statusLabel.setText( "Pasting/Moving Paste" );
+						
+						UndoablePaste undo = (UndoablePaste)undoStack.pop();
+						undo.undo( map );
+						
+						int rectWidth = undo.oldTiles.length;
+						int rectHeight = undo.oldTiles[0].length;
+						
+						//save old tiles (for undo)
+	            		int[][] oldTiles = new int[rectWidth][rectHeight];
+	            		for( int i = 0; i < rectWidth; i++ ) {
+	            			for( int j = 0; j < rectHeight; j++ ) {
+	            				oldTiles[i][j] = map.getMapTile( mX + i, mY + j );
+	            			}
+	            		}
+						
+						undo.x = mX;
+						undo.y = mY;
+						undo.oldTiles = oldTiles;
+						
+						undo.redo( map );
+						undoStack.push( undo );
+						
+						repaint();
+					}
 					
-					UndoablePaste undo = (UndoablePaste)undoStack.pop();
-					undo.undo( map );
-					
-					int rectWidth = undo.oldTiles.length;
-					int rectHeight = undo.oldTiles[0].length;
-					
-					//save old tiles (for undo)
-            		int[][] oldTiles = new int[rectWidth][rectHeight];
-            		for( int i = 0; i < rectWidth; i++ ) {
-            			for( int j = 0; j < rectHeight; j++ ) {
-            				oldTiles[i][j] = map.getMapTile( mX + i, mY + j );
-            			}
-            		}
-					
-					undo.x = mX;
-					undo.y = mY;
-					undo.oldTiles = oldTiles;
-					
-					undo.redo( map );
-					undoStack.push( undo );
-					
-					repaint();
+					//Select Snakey Area
+					else if( dragType.equals( "select" ) ) {
+						mapEditor.statusLabel.setText( "Selecting Area" );
+						
+						DO SNAKEY SELECTIONS!;
+						
+						repaint();
+					}
+					//Snakey Paste
+					else if( dragType.equals( "paste" ) ) {
+						
+						DO SNAKEY DRAG PASTINGS!;
+						
+						repaint();
+					}
 				}
 			}
 		}
@@ -3103,6 +3193,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 			mapDisplay.externalCommand( "highlightMultipleTiles" );
 		} else if( e.getActionCommand().equals( "selectAreaExternal" ) ) {
 			mapDisplay.externalCommand( "selectArea" );
+		} else if( e.getActionCommand().equals( "selectSnakeyAreaExternal" ) ) {
+			mapDisplay.externalCommand( "selectSnakeyArea" );
 		}
 	}
 
