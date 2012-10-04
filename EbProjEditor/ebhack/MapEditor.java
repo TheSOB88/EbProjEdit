@@ -517,7 +517,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 		private boolean editMap = true, drawTileNums = false, enableHighlighting = false, enableDraggingTiles = true;
 		private int dragTileX = -1, dragTileY = -1;
 		private int selectAreaX1 = -1, selectAreaY1 = -1, selectAreaX2 = -1, selectAreaY2 = -1;
-		private String submode = null;
+		private String subMode = null;
+		private String dragType = null;
 		private List<Integer> highlightedTiles = null;
 		
 		private boolean drawSprites = false, editSprites = false,
@@ -657,7 +658,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6F));
 						g.fillRect(j * MapData.TILE_HEIGHT + 1, i * MapData.TILE_WIDTH + 1, MapData.TILE_WIDTH, MapData.TILE_HEIGHT);
 						g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0F));
-                    } else if( editMap && ( enableHighlighting || ( submode != null && submode.equals( "highlightMultipleTiles" ) ) )
+                    } else if( editMap && ( enableHighlighting || ( subMode != null && subMode.equals( "highlightMultipleTiles" ) ) )
                     		&& highlightedTiles != null && highlightedTiles.contains( mapTile ) 
                     		&& sector.tileset == mapEditor.tilesetChooser.getSelectedIndex() ) {
                     	g.setPaint( colorFromInt( highlightedTiles.indexOf( mapTile ) ) );
@@ -671,16 +672,25 @@ public class MapEditor extends ToolModule implements ActionListener,
 			if (grid && !gamePreview)
 				drawGrid(g);
 			
-            if( editMap && submode != null && submode.equals( "selectArea" ) ) {
+			//draw selection rectangle
+            if( editMap && subMode != null && subMode.equals( "selectArea" ) ) {
             	if( selectAreaX1 != -1 ) {
             		int rectX = selectAreaX1 > selectAreaX2 ? selectAreaX2 : selectAreaX1;
             		int rectY = selectAreaY1 > selectAreaY2 ? selectAreaY2 : selectAreaY1;
-            		
+
                 	g.setPaint(Color.red);
                 	g.draw( new Rectangle2D.Double(
 					  ( rectX - x ) * MapData.TILE_WIDTH + 1, ( rectY - y ) * MapData.TILE_HEIGHT + 1, 
 					  Math.abs( selectAreaX2 - selectAreaX1 ) * MapData.TILE_WIDTH + MapData.TILE_WIDTH,
 					  Math.abs( selectAreaY2 - selectAreaY1 ) * MapData.TILE_HEIGHT + MapData.TILE_HEIGHT ) );
+                	g.draw( new Rectangle2D.Double(
+					  ( rectX - x ) * MapData.TILE_WIDTH, ( rectY - y ) * MapData.TILE_HEIGHT, 
+					  Math.abs( selectAreaX2 - selectAreaX1 ) * MapData.TILE_WIDTH + MapData.TILE_WIDTH + 2,
+					  Math.abs( selectAreaY2 - selectAreaY1 ) * MapData.TILE_HEIGHT + MapData.TILE_HEIGHT + 2 ) );
+                	g.draw( new Rectangle2D.Double(
+					  ( rectX - x ) * MapData.TILE_WIDTH + 2, ( rectY - y ) * MapData.TILE_HEIGHT + 2, 
+					  Math.abs( selectAreaX2 - selectAreaX1 ) * MapData.TILE_WIDTH + MapData.TILE_WIDTH - 2,
+					  Math.abs( selectAreaY2 - selectAreaY1 ) * MapData.TILE_HEIGHT + MapData.TILE_HEIGHT - 2 ) );
             	}
             }
 
@@ -1159,26 +1169,26 @@ public class MapEditor extends ToolModule implements ActionListener,
 
 		public void externalCommand(String cmd) {
 			if( cmd.equals( "highlightMultipleTiles" ) ) {			
-				if( this.submode != null && this.submode.equals( "highlightMultipleTiles" ) ) {
-					this.submode = null;
+				if( this.subMode != null && this.subMode.equals( "highlightMultipleTiles" ) ) {
+					this.subMode = null;
 					mapEditor.statusLabel.setText( "Exited Highlight Tiles Mode" );
 				} else {
 					clearSubmodes();
-					this.submode = "highlightMultipleTiles";
+					this.subMode = "highlightMultipleTiles";
 					this.highlightedTiles = null;	
 					mapEditor.statusLabel.setText( "Entered Highlight Tiles Mode" );
 				}
 				repaint();
 				tileSelector.repaint();
 			} else if( cmd.equals( "selectArea" ) ) {
-				if( this.submode != null && this.submode.equals( "selectArea" ) ) {
-					this.submode = null;
+				if( this.subMode != null && this.subMode.equals( "selectArea" ) ) {
+					this.subMode = null;
 					mapEditor.statusLabel.setText( "Exited Select Area Mode" );
 
 					this.setCursor( Cursor.getDefaultCursor() );
 				} else {
 					clearSubmodes();
-					this.submode = "selectArea";
+					this.subMode = "selectArea";
 					this.selectAreaX1 = -1;
 					this.selectAreaY1 = -1;
 					this.selectAreaX2 = -1;
@@ -1196,25 +1206,9 @@ public class MapEditor extends ToolModule implements ActionListener,
 					&& (e.getY() >= 1)
 					&& (e.getY() <= screenHeight * MapData.TILE_HEIGHT + 2)) {
 				if (editMap) {
-					if( submode == null ) {
-						if (e.getButton() == MouseEvent.BUTTON1) {
-							int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
-							int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
-							if (e.isShiftDown()) {
-								tileSelector.selectTile(map.getMapTile(mX, mY));
-							} else if( e.isControlDown() ) {							
-							} else {
-								// Keep track of the undo stuff
-								undoStack.push(new UndoableTileChange(mX, mY, map
-										.getMapTile(mX, mY), tileSelector
-										.getSelectedTile()));
-								undoButton.setEnabled(true);
-								redoStack.clear();
-	
-								map.setMapTile(mX, mY, tileSelector.getSelectedTile());
-								repaint();
-							}
-						} else if (e.getButton() == MouseEvent.BUTTON3) {
+					if( subMode == null ) {
+						//select sector
+						if (e.getButton() == MouseEvent.BUTTON3) {
 							// Make sure they didn't click on the border
 							int sX = (x + ((e.getX() - 1) / MapData.TILE_WIDTH))
 									/ MapData.SECTOR_WIDTH;
@@ -1222,7 +1216,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 									/ MapData.SECTOR_HEIGHT;
 							selectSector(sX, sY);
 						}
-					} else if( submode.equals( "highlightMultipleTiles" ) ) {
+					} else if( subMode.equals( "highlightMultipleTiles" ) ) {
 						int mX = ( e.getX() - 1 ) / MapData.TILE_WIDTH + x;
 						int mY = ( e.getY() - 1 ) / MapData.TILE_HEIGHT + y;
 						if( this.highlightedTiles == null ) {
@@ -1374,7 +1368,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 						&& editMap ) {
 					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
 					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
-					if( submode == null ) {
+					if( subMode == null ) {
 						if( e.getButton() == MouseEvent.BUTTON1 && enableDraggingTiles ) {
 							if (e.isShiftDown()) {
 								tileSelector.selectTile(map.getMapTile(mX, mY));
@@ -1394,7 +1388,9 @@ public class MapEditor extends ToolModule implements ActionListener,
 								dragTileY = mY;
 							}
 						}
-					} else if( submode.equals( "selectArea" ) ) {
+					} else if( subMode.equals( "selectArea" ) ) {
+						dragType = "select";
+						
 						selectAreaX1 = selectAreaX2 = mX;
 						selectAreaY1 = selectAreaY2 = mY;
 						
@@ -1403,7 +1399,10 @@ public class MapEditor extends ToolModule implements ActionListener,
 				}
 			}  else if (e.getButton() == MouseEvent.BUTTON3) {
 				/**TODO: Select multiple sectors?*/
-				if( submode.equals( "selectArea" ) ) {
+				//Select Area
+				if( subMode.equals( "selectArea" ) ) {
+					dragType = "paste";
+					
 					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
 					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
 					
@@ -1413,6 +1412,7 @@ public class MapEditor extends ToolModule implements ActionListener,
             		int rectWidth = Math.abs( selectAreaX2 - selectAreaX1 ) + 1;
             		int rectHeight = Math.abs( selectAreaY2 - selectAreaY1 ) + 1;
             		
+            		//save old tiles (for undo)
             		int[][] oldTiles = new int[rectWidth][rectHeight];
             		for( int i = 0; i < rectWidth; i++ ) {
             			for( int j = 0; j < rectHeight; j++ ) {
@@ -1420,12 +1420,18 @@ public class MapEditor extends ToolModule implements ActionListener,
             			}
             		}
             		
-            		int[][] newTiles = new int[rectWidth][rectHeight];
+            		//read the new tiles 
+            		int[][] newTiles = new int[rectWidth][rectHeight];            	
             		for( int i = 0; i < rectWidth; i++ ) {
             			for( int j = 0; j < rectHeight; j++ ) {
-            				int fromTile = map.getMapTile( rectX + i, rectY + j );
-            				map.setMapTile( mX + i, mY + j, fromTile );
-            				newTiles[i][j] = fromTile;
+            				newTiles[i][j] = map.getMapTile( rectX + i, rectY + j );
+            			}
+            		}
+
+        			//set the new tiles (broken up in case the regions overlap)
+            		for( int i = 0; i < rectWidth; i++ ) {
+            			for( int j = 0; j < rectHeight; j++ ) {
+            				map.setMapTile( mX + i, mY + j, newTiles[i][j] );
             			}
             		}
             		
@@ -1454,9 +1460,17 @@ public class MapEditor extends ToolModule implements ActionListener,
 					pushDoorFromMouseXY(movingDoor, mx, my);
 					movingDoor = null;
 					repaint();
-				} else if( editMap && enableDraggingTiles ) {
+				} else if( editMap && subMode == null ) {
 					dragTileX = dragTileY = -1;
 					mapEditor.statusLabel.setText( "OK" );
+				} else if( editMap && subMode.equals( "selectArea" ) ) {
+					if( dragType.equals( "select" ) ) {
+						mapEditor.statusLabel.setText( "Select finished" );
+						dragType = null;
+					} else if( dragType.equals( "paste" ) ) {
+						mapEditor.statusLabel.setText( "Paste finished" );
+						dragType = null;
+					}
 				}
 			}
 		}
@@ -1489,27 +1503,59 @@ public class MapEditor extends ToolModule implements ActionListener,
 			} else if( editMap ) {
 				int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
 				int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
-				if( submode == null ) {
-					if( enableDraggingTiles ) {
-						mapEditor.statusLabel.setText( "dragging tiles" );
-						if( e.isControlDown() ) {							
-						} else if( mX != dragTileX || mY != dragTileY ) {
-							// Keep track of the undo stuff
-							undoStack.push( new UndoableTileChange( mX, mY, 
-									map.getMapTile( mX, mY ), tileSelector.getSelectedTile() ) );
-							undoButton.setEnabled( true );
-							redoStack.clear();
-	
-							map.setMapTile( mX, mY, tileSelector.getSelectedTile() );
-							repaint();
-							
-							dragTileX = mX;
-							dragTileY = mY;
+				
+				if( dragType == null || dragType.equals( "select" ) ) {
+					if( subMode == null ) {
+						if( enableDraggingTiles ) {
+							mapEditor.statusLabel.setText( "dragging tiles" );
+							if( e.isControlDown() ) {							
+							} else if( mX != dragTileX || mY != dragTileY ) {
+								// Keep track of the undo stuff
+								undoStack.push( new UndoableTileChange( mX, mY, 
+										map.getMapTile( mX, mY ), tileSelector.getSelectedTile() ) );
+								undoButton.setEnabled( true );
+								redoStack.clear();
+		
+								map.setMapTile( mX, mY, tileSelector.getSelectedTile() );
+								repaint();
+								
+								dragTileX = mX;
+								dragTileY = mY;
+							}
 						}
+					//Select Area
+					} else if( subMode.equals( "selectArea" ) ) {
+						mapEditor.statusLabel.setText( "Selecting Area" );
+						
+						selectAreaX2 = mX;
+						selectAreaY2 = mY;
+						
+						repaint();
 					}
-				} else if( submode.equals( "selectArea" ) ) {
-					selectAreaX2 = mX;
-					selectAreaY2 = mY;
+				//Paste
+				} else if( dragType.equals( "paste" ) ) {
+					mapEditor.statusLabel.setText( "Pasting/Moving Paste" );
+					
+					UndoablePaste undo = (UndoablePaste)undoStack.pop();
+					undo.undo( map );
+					
+					int rectWidth = undo.oldTiles.length;
+					int rectHeight = undo.oldTiles[0].length;
+					
+					//save old tiles (for undo)
+            		int[][] oldTiles = new int[rectWidth][rectHeight];
+            		for( int i = 0; i < rectWidth; i++ ) {
+            			for( int j = 0; j < rectHeight; j++ ) {
+            				oldTiles[i][j] = map.getMapTile( mX + i, mY + j );
+            			}
+            		}
+					
+					undo.x = mX;
+					undo.y = mY;
+					undo.oldTiles = oldTiles;
+					
+					undo.redo( map );
+					undoStack.push( undo );
 					
 					repaint();
 				}
