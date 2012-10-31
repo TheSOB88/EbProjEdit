@@ -23,6 +23,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -457,6 +458,35 @@ public class MapEditor extends ToolModule implements ActionListener,
         		}
 			}
 		}
+		
+		private class UndoableSnakeyPaste implements UndoableAction {
+			public int x, y;//x, y of first point
+			public List<Point> snake;//the points for the whole snake, relative to the first point
+			public int[] oldTiles;
+			public int[] newTiles;
+			
+			public UndoableSnakeyPaste( int _x, int _y, List<Point> _snake, int[] _oldTiles, int[] _newTiles ) {
+				x = _x;
+				y = _y;
+				snake = _snake;
+				oldTiles = _oldTiles;
+				newTiles = _newTiles;
+			}
+			
+			public void undo(MapData map) {
+				for( int i = 0; i < snake.size(); i++ ) {
+					Point point = snake.get( i );
+    				map.setMapTile( x + point.x, y + point.y, oldTiles[i] );
+        		}
+			}
+			
+			public void redo(MapData map) {
+				for( int i = 0; i < snake.size(); i++ ) {
+					Point point = snake.get( i );
+    				map.setMapTile( x + point.x, y + point.y, newTiles[i] );
+        		}
+			}
+		}
 
 //		private class UndoableSectorPaste implements UndoableAction {
 //			public int sectorX, sectorY;
@@ -519,6 +549,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 		private boolean editMap = true, drawTileNums = false, enableHighlighting = false, enableDraggingTiles = true;
 		private int dragTileX = -1, dragTileY = -1;
 		private int selectAreaX1 = -1, selectAreaY1 = -1, selectAreaX2 = -1, selectAreaY2 = -1;
+		private List<Point> selectSnake = null;
 		private String subMode = null;
 		private String dragType = null;
 		private List<Integer> highlightedTiles = null;
@@ -698,10 +729,36 @@ public class MapEditor extends ToolModule implements ActionListener,
 			
 			//draw snakey selection
             if( editMap && subMode != null && subMode.equals( "selectSnakeyArea" ) ) {
-            	if( selectAreaX1 != -1 ) {
-            		DRAW THE SNAKE!;
-            		
+            	if( selectSnake != null && selectSnake.size() > 0 ) {
                 	g.setPaint(Color.red);
+                	
+                	for( Point point: selectSnake ) {
+                		Point point2 = new Point( selectAreaX1 + point.x - x, selectAreaY1 + point.y - y );
+                		//left border
+                		if( !selectSnake.contains( new Point( point.x - 1, point.y ) ) ) {
+                    		g.draw( new Line2D.Double( point2.x * 32, point2.y * 32, point2.x * 32, ( point2.y + 1 ) * 32 + 2 ) );
+                    		g.draw( new Line2D.Double( point2.x * 32 + 1, point2.y * 32, point2.x * 32 + 1, ( point2.y + 1 ) * 32 + 2 ) );
+                    		g.draw( new Line2D.Double( point2.x * 32 + 2, point2.y * 32, point2.x * 32 + 2, ( point2.y + 1 ) * 32 + 2 ) );
+                    	}
+                		//top border
+                		if( !selectSnake.contains( new Point( point.x, point.y - 1 ) ) ) {
+                    		g.draw( new Line2D.Double( point2.x * 32, point2.y * 32, ( point2.x + 1 ) * 32, point2.y * 32 ) );
+                    		g.draw( new Line2D.Double( point2.x * 32, point2.y * 32 + 1, ( point2.x + 1 ) * 32, point2.y * 32 + 1 ) );
+                    		g.draw( new Line2D.Double( point2.x * 32, point2.y * 32 + 2, ( point2.x + 1 ) * 32, point2.y * 32 + 2 ) );
+                    	}
+                		//right border
+                		if( !selectSnake.contains( new Point( point.x + 1, point.y ) ) ) {
+                    		g.draw( new Line2D.Double( ( point2.x + 1 ) * 32, point2.y * 32, ( point2.x + 1 ) * 32, ( point2.y + 1 ) * 32 ) );
+                    		g.draw( new Line2D.Double( ( point2.x + 1 ) * 32 + 1, point2.y * 32, ( point2.x + 1 ) * 32 + 1, ( point2.y + 1 ) * 32 ) );
+                    		g.draw( new Line2D.Double( ( point2.x + 1 ) * 32 + 2, point2.y * 32, ( point2.x + 1 ) * 32 + 2, ( point2.y + 1 ) * 32 ) );
+                    	}
+                		//bottom border
+                		if( !selectSnake.contains( new Point( point.x, point.y + 1 ) ) ) {
+                    		g.draw( new Line2D.Double( point2.x * 32, ( point2.y + 1 ) * 32, ( point2.x + 1 ) * 32 + 2, ( point2.y + 1 ) * 32 ) );
+                    		g.draw( new Line2D.Double( point2.x * 32, ( point2.y + 1 ) * 32 + 1, ( point2.x + 1 ) * 32 + 2, ( point2.y + 1 ) * 32 + 1 ) );
+                    		g.draw( new Line2D.Double( point2.x * 32, ( point2.y + 1 ) * 32 + 2, ( point2.x + 1 ) * 32 + 2, ( point2.y + 1 ) * 32 + 2 ) );
+                    	}
+                	}
             	}
             }
 
@@ -1242,6 +1299,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 							int sY = (y + ((e.getY() - 1) / MapData.TILE_HEIGHT))
 									/ MapData.SECTOR_HEIGHT;
 							selectSector(sX, sY);
+							
+							dragType = null;
 						}
 					} else if( subMode.equals( "highlightMultipleTiles" ) ) {
 						int mX = ( e.getX() - 1 ) / MapData.TILE_WIDTH + x;
@@ -1404,6 +1463,8 @@ public class MapEditor extends ToolModule implements ActionListener,
 								int oldTile = map.getMapTile( mX, mY );
 								int newTile = tileSelector.getSelectedTile();
 								
+								dragType = "dragTiles";
+								
 								if( oldTile != newTile ) {
 									// Keep track of the undo stuff
 									undoStack.push( new UndoableTileChange( mX, mY, oldTile, newTile ) );
@@ -1430,6 +1491,11 @@ public class MapEditor extends ToolModule implements ActionListener,
 						
 						selectAreaX1 = mX;
 						selectAreaY1 = mY;
+						selectSnake = new ArrayList<Point>();
+						selectSnake.add( new Point( 0, 0 ) );//selectSnake's points are relative to the first
+						
+						selectAreaX2 = mX;
+						selectAreaY2 = mY;//last point selected, for efficiency purposes
 						
 						repaint();
 					}
@@ -1484,10 +1550,21 @@ public class MapEditor extends ToolModule implements ActionListener,
 					int mX = (e.getX() - 1) / MapData.TILE_WIDTH + x;
 					int mY = (e.getY() - 1) / MapData.TILE_HEIGHT + y;
 					
-					//TODO: Create Undo
-					//TODO: Paste Snake
+					selectAreaX2 = mX;
+					selectAreaY2 = mY;//for efficiency - only move pastes if one is different
+					
+					//save old tiles (for undo), read new tiles
+            		int[] oldTiles = new int[selectSnake.size()];
+            		int[] fromTiles = new int[selectSnake.size()];
+            		for( int i = 0; i < oldTiles.length; i++ ) {
+        				oldTiles[i] = map.getMapTile( mX + selectSnake.get( i ).x,  mY + selectSnake.get( i ).y );
+            			fromTiles[i] = map.getMapTile( selectAreaX1 + selectSnake.get( i ).x, selectAreaY1 + selectSnake.get( i ).y );
+            		}
             		
-            		undoStack.push( new UndoablePaste( mX, mY, oldTiles, newTiles ) );
+            		UndoableSnakeyPaste undo = new UndoableSnakeyPaste( mX, mY, selectSnake, oldTiles, fromTiles );
+            		undo.redo( map );//cheating by using the redo code to set the tiles
+            		
+            		undoStack.push( undo );
 					undoButton.setEnabled( true );
 					redoStack.clear();
 					repaint();
@@ -1572,7 +1649,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 				if( subMode == null ) { 
 					mapEditor.statusLabel.setText( "dragType: " + dragType );
 					//Pencil-dragging tiles
-					if( dragType == null ) {
+					if( dragType != null && dragType.equals( "dragTiles" ) ) {
 						if( enableDraggingTiles ) {
 							mapEditor.statusLabel.setText( "dragging tiles" );
 							if( e.isControlDown() ) {							
@@ -1607,47 +1684,80 @@ public class MapEditor extends ToolModule implements ActionListener,
 					}
 					//Paste
 					else if( dragType.equals( "paste" ) ) {
-						mapEditor.statusLabel.setText( "Pasting/Moving Paste" );
+						UndoablePaste undo = (UndoablePaste)undoStack.lastElement();
 						
-						UndoablePaste undo = (UndoablePaste)undoStack.pop();
-						undo.undo( map );
-						
-						int rectWidth = undo.oldTiles.length;
-						int rectHeight = undo.oldTiles[0].length;
-						
-						//save old tiles (for undo)
-	            		int[][] oldTiles = new int[rectWidth][rectHeight];
-	            		for( int i = 0; i < rectWidth; i++ ) {
-	            			for( int j = 0; j < rectHeight; j++ ) {
-	            				oldTiles[i][j] = map.getMapTile( mX + i, mY + j );
-	            			}
-	            		}
-						
-						undo.x = mX;
-						undo.y = mY;
-						undo.oldTiles = oldTiles;
-						
-						undo.redo( map );
-						undoStack.push( undo );
-						
-						repaint();
+						if( undo.x != mX || undo.y != mY ) {
+							mapEditor.statusLabel.setText( "Pasting/Moving Paste" );
+							
+							undoStack.pop();
+							undo.undo( map );
+							
+							int rectWidth = undo.oldTiles.length;
+							int rectHeight = undo.oldTiles[0].length;
+							
+							//save old tiles (for undo)
+		            		int[][] oldTiles = new int[rectWidth][rectHeight];
+		            		for( int i = 0; i < rectWidth; i++ ) {
+		            			for( int j = 0; j < rectHeight; j++ ) {
+		            				oldTiles[i][j] = map.getMapTile( mX + i, mY + j );
+		            			}
+		            		}
+							
+							undo.x = mX;
+							undo.y = mY;
+							undo.oldTiles = oldTiles;
+							
+							undo.redo( map );
+							undoStack.push( undo );
+							
+							repaint();
+						}
 					}
-					
+				} else if( subMode.equals( "selectSnakeyArea" ) ) {
+					if( dragType == null ) {
+						mapEditor.statusLabel.setText( "How did dragType get to be null at such a time?" );
+					}
 					//Select Snakey Area
-					else if( dragType.equals( "select" ) ) {
-						mapEditor.statusLabel.setText( "Selecting Area" );
-						
-						DO SNAKEY SELECTIONS!;
-						
-						repaint();
+					else if( dragType.equals( "selectSnake" ) ) {
+						if( mX != selectAreaX2 || mY != selectAreaY2 ) {
+							mapEditor.statusLabel.setText( "Selecting Snakey Area" );
+							
+							Point point = new Point( mX - selectAreaX1, mY - selectAreaY1 );
+							if( !selectSnake.contains( point ) ) {
+								selectSnake.add( point );
+								mapEditor.statusLabel.setText( "Point been added!!" );
+							}
+							
+							selectAreaX2 = mX;
+							selectAreaY2 = mY;
+						}
 					}
 					//Snakey Paste
-					else if( dragType.equals( "paste" ) ) {
-						
-						DO SNAKEY DRAG PASTINGS!;
-						
-						repaint();
+					else if( dragType.equals( "snakeyPaste" ) ) {
+						if( mX != selectAreaX2 || mY != selectAreaY2 ) {
+							mapEditor.statusLabel.setText( "Moving Snakey Paste" );
+							
+							UndoableSnakeyPaste undo = (UndoableSnakeyPaste)undoStack.pop();
+							undo.undo( map );
+							
+							//save old tiles (for undo)
+		            		int[] oldTiles = new int[undo.oldTiles.length];
+		            		for( int i = 0; i < oldTiles.length; i++ ) {
+		        				oldTiles[i] = map.getMapTile( mX + selectSnake.get( i ).x, mY + selectSnake.get( i ).y );
+		            		}
+							
+							undo.x = mX;
+							undo.y = mY;
+							undo.oldTiles = oldTiles;
+							
+							undo.redo( map );
+							undoStack.push( undo );
+							
+							selectAreaX2 = mX;
+							selectAreaY2 = mY;
+						}
 					}
+					repaint();
 				}
 			}
 		}
@@ -1666,7 +1776,7 @@ public class MapEditor extends ToolModule implements ActionListener,
 
 		//called when submode is changed
 		public void clearSubmodes() {
-			
+			subMode = null;
 		}
 		
 		public void changeMode(int mode) {
